@@ -6,6 +6,7 @@ secret or connection value is ever hardcoded here.
 """
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import quote_plus
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -109,7 +110,10 @@ class Settings(BaseSettings):
         if self.mssql_auth_mode == "sql":
             if not (self.mssql_server and self.mssql_database and self.mssql_username):
                 return ""
-            credentials = f"{self.mssql_username}:{self.mssql_password}"
+            # Username/password are URL-encoded since either may contain
+            # characters (e.g. "@") that would otherwise be misread as the
+            # userinfo/host separator.
+            credentials = f"{quote_plus(self.mssql_username)}:{quote_plus(self.mssql_password)}"
         else:
             if not (self.mssql_server and self.mssql_database):
                 return ""

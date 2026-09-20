@@ -89,6 +89,21 @@ def test_windows_auth_mode_is_empty_when_server_not_configured() -> None:
     assert settings.sqlalchemy_database_uri == ""
 
 
+def test_sqlalchemy_uri_url_encodes_special_characters_in_password() -> None:
+    """A literal '@' (or other URL-significant character) in the password
+    must not be misread as the userinfo/host separator."""
+    settings = make_settings(
+        mssql_server="db.example.net",
+        mssql_database="ChildcareBenefit",
+        mssql_username="db_admin",
+        mssql_password="Admin@321",
+    )
+
+    uri = settings.sqlalchemy_database_uri
+
+    assert uri.startswith("mssql+pyodbc://db_admin:Admin%40321@db.example.net/ChildcareBenefit")
+
+
 def test_invalid_log_level_is_rejected() -> None:
     with pytest.raises(ValueError):
         make_settings(log_level="NOT_A_LEVEL")

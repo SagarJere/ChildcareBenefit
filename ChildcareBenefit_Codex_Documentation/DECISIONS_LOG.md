@@ -505,3 +505,21 @@
     were renamed from "Eligibility Report" to "Eligibility & Payout",
     with an explicit mention of the monthly-schedule drill-down added to
     the page's description.
+51. Free-tier cloud hosting (user direction 2026-09-20): SmarterASP.NET
+    (SQL Server, user's existing account) + a single combined Render.com
+    web service for both frontend and backend, no separate Vercel/
+    Cloudflare Pages hosting. `app/main.py` now conditionally mounts a
+    `static/` directory (frontend build output) and serves `index.html`
+    for any unmatched path, so FastAPI serves the built React app
+    same-origin — this only activates when `backend/static/` exists, so
+    local development (Vite dev server on :5173, calling the backend
+    separately) is unaffected. A new root-level `Dockerfile` (multi-stage:
+    Node build of the frontend, copied into the existing Python backend
+    image) is used only for this combined deployment; `backend/
+    Dockerfile`, `frontend/Dockerfile`, and `docker-compose.yml` are
+    unchanged and still used for local development. Same-origin serving
+    also means CORS is no longer load-bearing in production, though the
+    existing `CORSMiddleware` config is left in place since it's still
+    needed for local dev (frontend on :5173, backend on :8000). Object
+    storage (MinIO) replacement for production, e.g. Cloudflare R2, was
+    discussed but not yet decided/actioned.

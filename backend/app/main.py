@@ -1,9 +1,12 @@
 """FastAPI application factory."""
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -12,6 +15,12 @@ from app.core.logging import configure_logging
 from app.core.middleware import CorrelationIdMiddleware
 
 logger = logging.getLogger(__name__)
+
+# Populated only in the combined single-service deployment (see root
+# Dockerfile), which copies the built frontend's `dist/` here. Absent in
+# local development, where the Vite dev server serves the frontend
+# separately — so static serving below is skipped entirely in that case.
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 
 def create_app() -> FastAPI:
@@ -43,6 +52,16 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    if STATIC_DIR.is_dir():
+        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+        @app.get("/{full_path:path}")
+        async def serve_frontend(full_path: str) -> FileResponse:
+            candidate = STATIC_DIR / full_path
+            if full_path and candidate.is_file():
+                return FileResponse(candidate)
+            return FileResponse(STATIC_DIR / "index.html")
 
     return app
 
