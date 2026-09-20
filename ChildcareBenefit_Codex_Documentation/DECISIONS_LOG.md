@@ -532,3 +532,20 @@
     `upload_attachment`), so no new validation logic was needed. Added a
     boundary test for a file just under the limit succeeding (previously
     only the over-limit rejection was tested).
+53. Mobile responsiveness fixes (user-reported 2026-09-20): the app's
+    persistent mobile nav (`AppLayout.tsx`, `sm:hidden` strip with 5-7
+    links) had no `flex-wrap`, so it overflowed the viewport width on
+    every single page on a phone — the main culprit for "UI going beyond
+    screen." The HR Reports page's tab bar (`ReportsPage.tsx`) had the
+    same problem with its 4 tabs (one is "Eligibility Utilization"),
+    fixed with horizontal scroll (`overflow-x-auto` + `whitespace-nowrap`
+    per tab) instead of wrapping, since it's an underlined tab bar where
+    multi-row wrapping would look broken. Also added defensive
+    `flex-wrap` to four page-header rows that pair a title with an
+    action button/badge (`ClaimsPage`, `ChildrenPage`,
+    `HRClaimDetailPage`, `ClaimDetailPage`) as a precaution, even though
+    only the two fixes above were confirmed overflowing. The rest of the
+    app (tables, modals, forms, filter rows, stat grids) was already
+    built with responsive patterns (`overflow-x-auto` on every table,
+    `flex-wrap` on filter/button rows, `sm:`-prefixed grid columns) from
+    earlier increments, so no other changes were needed.

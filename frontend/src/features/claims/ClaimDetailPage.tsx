@@ -119,7 +119,7 @@ export function ClaimDetailPage() {
         Back to My Claims
       </Link>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Claim #{claim.claim_id}</h1>
           <p className="mt-1 text-slate-600">{claim.child_name}</p>

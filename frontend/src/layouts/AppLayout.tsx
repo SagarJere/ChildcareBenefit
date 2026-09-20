@@ -62,7 +62,7 @@ export function AppLayout() {
             </button>
           </div>
         </div>
-        <nav className="flex items-center gap-1 border-t border-slate-100 px-4 py-2 sm:hidden">
+        <nav className="flex flex-wrap items-center gap-1 border-t border-slate-100 px-4 py-2 sm:hidden">
           <NavLink to="/" end className={navLinkClasses}>
             Home
           </NavLink>

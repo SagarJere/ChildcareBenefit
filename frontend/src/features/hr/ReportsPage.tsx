@@ -26,13 +26,13 @@ export function ReportsPage() {
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium ${
+            className={`shrink-0 whitespace-nowrap px-3 py-2 text-sm font-medium ${
               tab === t.key
                 ? 'border-b-2 border-indigo-700 text-indigo-700'
                 : 'text-slate-500 hover:text-slate-700'
