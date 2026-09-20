@@ -448,7 +448,7 @@ def test_upload_attachment_rejects_oversized_file(login_as) -> None:
         },
     ).json()
 
-    oversized_content = b"0" * (11 * 1024 * 1024)  # default limit is 10 MB
+    oversized_content = b"0" * (2 * 1024 * 1024)  # default limit is 1 MB
     response = client.post(
         f"/api/v1/claims/{claim['claim_id']}/attachments",
         data={"attachment_type": RECEIPT_INVOICE},
@@ -456,6 +456,38 @@ def test_upload_attachment_rejects_oversized_file(login_as) -> None:
     )
 
     assert response.status_code == 413
+
+
+def test_upload_attachment_accepts_file_just_under_the_limit(
+    login_as, minio_required, db_session: Session
+) -> None:
+    client = login_as(memp_id=920014, employee_id="92000014", Joindate=datetime(2018, 1, 1))
+    child = _add_child(client, "Kid Fourteen", "2026-03-01")
+    claim = client.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-08-01",
+            "invoice_number": "INV-14",
+            "invoice_amount": "1000.00",
+        },
+    ).json()
+
+    just_under_limit_content = b"0" * (1024 * 1024 - 1)  # default limit is 1 MB
+    response = client.post(
+        f"/api/v1/claims/{claim['claim_id']}/attachments",
+        data={"attachment_type": RECEIPT_INVOICE},
+        files={"file": ("invoice.pdf", just_under_limit_content, "application/pdf")},
+    )
+
+    assert response.status_code == 201, response.text
+    attachment = response.json()
+
+    from app.services.storage.minio_client import get_minio_client
+
+    row = db_session.get(ClaimAttachment, attachment["attachment_id"])
+    if row is not None:
+        get_minio_client().remove_object(row.BucketName, row.ObjectKey)
 
 
 def test_upload_attachment_rejected_once_submitted(login_as) -> None:

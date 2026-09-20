@@ -523,3 +523,12 @@
     needed for local dev (frontend on :5173, backend on :8000). Object
     storage (MinIO) replacement for production, e.g. Cloudflare R2, was
     discussed but not yet decided/actioned.
+52. Claim document upload limit lowered from 10 MB to 1 MB default
+    (user direction 2026-09-20), anticipating a free-tier object storage
+    plan (e.g. Cloudflare R2's free tier) for production once MinIO is
+    replaced — see item 51. Changed `max_upload_size_mb`'s default in
+    `app/core/config.py` (and `.env.example`); the limit was already
+    fully config-driven (`app/services/claim_service.py`'s
+    `upload_attachment`), so no new validation logic was needed. Added a
+    boundary test for a file just under the limit succeeding (previously
+    only the over-limit rejection was tested).

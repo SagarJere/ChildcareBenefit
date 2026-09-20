@@ -64,7 +64,7 @@ class Settings(BaseSettings):
     # --- Claim document uploads ---
     # Not specified in any project document — a standard, configurable
     # default (see DECISIONS_LOG.md item 22).
-    max_upload_size_mb: int = Field(default=10)
+    max_upload_size_mb: int = Field(default=1)
     allowed_upload_extensions: str = Field(default="pdf,jpg,jpeg,png")
 
     @property
