@@ -1,0 +1,103 @@
+import { useQuery } from '@tanstack/react-query'
+import { AlertTriangle, FileText, Loader2, Plus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+
+import { listClaims } from '../../api/claims'
+import { formatCurrency, formatDate } from '../../lib/format'
+import { ClaimStatusBadge } from './ClaimStatusBadge'
+
+export function ClaimsPage() {
+  const { data: claims, isPending, isError } = useQuery({
+    queryKey: ['claims'],
+    queryFn: listClaims,
+  })
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">My Claims</h1>
+          <p className="mt-1 text-slate-600">Raise and track childcare benefit claims.</p>
+        </div>
+        <Link
+          to="/claims/new"
+          className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Raise Claim
+        </Link>
+      </div>
+
+      {isPending && (
+        <div className="flex items-center gap-2 text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Loading claims…
+        </div>
+      )}
+
+      {isError && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          Could not load your claims. Please try again shortly.
+        </div>
+      )}
+
+      {claims && claims.length === 0 && (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+          <FileText className="h-8 w-8 text-slate-300" aria-hidden="true" />
+          <p className="text-slate-600">You haven't raised any claims yet.</p>
+          <Link
+            to="/claims/new"
+            className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Raise your first claim
+          </Link>
+        </div>
+      )}
+
+      {claims && claims.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-slate-100 text-sm">
+            <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Child</th>
+                <th className="px-4 py-3">Invoice</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {claims.map((claim) => {
+                const isEditable = claim.claim_status === 'Draft' || claim.claim_status === 'SentBack'
+                return (
+                  <tr key={claim.claim_id}>
+                    <td className="px-4 py-3 font-medium text-slate-900">{claim.child_name}</td>
+                    <td className="px-4 py-3 text-slate-600">{claim.invoice_number}</td>
+                    <td className="px-4 py-3 text-slate-600">{formatDate(claim.invoice_date)}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {formatCurrency(claim.invoice_amount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <ClaimStatusBadge status={claim.claim_status} />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        to={`/claims/${claim.claim_id}`}
+                        className="font-medium text-indigo-700 hover:underline"
+                      >
+                        {isEditable ? 'Continue' : 'View'}
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
