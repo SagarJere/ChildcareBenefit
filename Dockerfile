@@ -14,7 +14,10 @@ COPY frontend/ .
 ENV VITE_API_BASE_URL=/api/v1
 RUN npm run build
 
-FROM python:3.12-slim
+# Pinned to bookworm (Debian 12) explicitly: the ODBC driver install below
+# targets Microsoft's debian/12 package repo, and the floating
+# "python:3.12-slim" tag has since moved to a newer Debian release.
+FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 

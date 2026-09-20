@@ -1,4 +1,7 @@
-FROM python:3.12-slim AS base
+# Pinned to bookworm (Debian 12) explicitly: the ODBC driver install below
+# targets Microsoft's debian/12 package repo, and the floating
+# "python:3.12-slim" tag has since moved to a newer Debian release.
+FROM python:3.12-slim-bookworm AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
