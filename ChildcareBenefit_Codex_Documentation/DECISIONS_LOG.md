@@ -606,3 +606,26 @@
     normal approval triggers — rather than hand-editing the derived
     numbers. Verified the corrected ledger afterward. No other claim in
     the database had this defect.
+56. Amount silently altered by mouse-wheel scroll (user-reported
+    2026-09-22): HR reported a claim entered as ₹9000 showing as
+    ₹8999.98 on the approval page. Root cause: all three ₹-amount inputs
+    (`RaiseClaimPage`, `ClaimDetailPage`'s edit form, and
+    `HRClaimDetailPage`'s approved-amount field) are native `<input
+    type="number" step="0.01">` — scrolling the mouse wheel while the
+    field is focused silently changes its value by one step per tick (a
+    well-known browser behavior), and nothing else in the codebase does
+    any numeric transformation on these fields (confirmed by grep and
+    reading every call site) — 2 accidental scroll ticks over a focused
+    field is exactly the observed ₹0.02 gap. Fixed by adding
+    `onWheel={(e) => e.currentTarget.blur()}` to all three inputs, so
+    scrolling the page moves the page instead of the value.
+
+    Checked production for other claims with this signature (an amount
+    a few cents off a round number): only Claim 5 (Submitted, not yet
+    approved) had it. Corrected its InvoiceAmount/ClaimAmount from
+    8999.98 back to 9000.00 directly (with explicit user confirmation),
+    then re-ran `eligibility_balance_service.sync_balance` for its
+    eligibility, since InProgressAmount had been derived from the wrong
+    figure (RemainingAmount is Allotted minus Approved only — see
+    `eligibility_repository.update_balance` — so it was already
+    unaffected).
