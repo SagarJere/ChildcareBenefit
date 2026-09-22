@@ -643,3 +643,14 @@
     HR-only employee-search endpoint). Typing a raw Employee ID directly
     still works in the autocomplete field; the dropdown is just a faster
     way to find one by name.
+58. Claim history modal clarity (user direction 2026-09-22): user
+    reported "Claim history" (`ClaimHistoryModal.tsx`, opened from the
+    HR claim detail page) needed its date changed to Invoice Date and a
+    link to each claim's detail page. Both were already present (the
+    date shown was already `claim.invoice_date`, and "Claim #N" was
+    already a link) — verified the backend mapping
+    (`HRClaimSummary.invoice_date = claim.InvoiceDate`) to rule out a
+    mislabeled field. Made both more explicit anyway, since the existing
+    link wasn't obviously an action: the date now reads "Invoice date:
+    …" instead of a bare unlabeled value, and each row has its own
+    visible "View details →" link separate from the claim number text.

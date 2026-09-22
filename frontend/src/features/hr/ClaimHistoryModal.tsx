@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { ArrowRight, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { listHRClaims } from '../../api/hr'
@@ -51,20 +51,26 @@ export function ClaimHistoryModal({
               }`}
             >
               <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-slate-900">
+                  Claim #{claim.claim_id}
+                  {claim.claim_id === currentClaimId && ' (this claim)'}
+                </span>
+                <ClaimStatusBadge status={claim.claim_status} />
+              </div>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-x-4 text-slate-600">
+                  <span>Invoice {claim.invoice_number}</span>
+                  <span>Invoice date: {formatDate(claim.invoice_date)}</span>
+                  <span>{formatCurrency(claim.invoice_amount)}</span>
+                </div>
                 <Link
                   to={`/hr/claims/${claim.claim_id}`}
                   onClick={onClose}
-                  className="font-medium text-indigo-700 hover:underline"
+                  className="flex shrink-0 items-center gap-1 font-medium text-indigo-700 hover:underline"
                 >
-                  Claim #{claim.claim_id}
-                  {claim.claim_id === currentClaimId && ' (this claim)'}
+                  View details
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
-                <ClaimStatusBadge status={claim.claim_status} />
-              </div>
-              <div className="mt-1 flex flex-wrap gap-x-4 text-slate-600">
-                <span>Invoice {claim.invoice_number}</span>
-                <span>{formatDate(claim.invoice_date)}</span>
-                <span>{formatCurrency(claim.invoice_amount)}</span>
               </div>
             </li>
           ))}
