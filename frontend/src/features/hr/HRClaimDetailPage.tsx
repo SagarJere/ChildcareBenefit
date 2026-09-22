@@ -15,6 +15,7 @@ import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { approveClaim, downloadHRAttachment, getHRClaimDetail, rejectClaim, sendBackClaim } from '../../api/hr'
+import { ApprovalHistoryTimeline } from '../../components/ApprovalHistoryTimeline'
 import { CollapsibleSection } from '../../components/CollapsibleSection'
 import { EligibilitySummary } from '../children/EligibilitySummary'
 import { formatCurrency, formatDate, formatMonthYear } from '../../lib/format'
@@ -258,23 +259,16 @@ export function HRClaimDetailPage() {
 
       {claim.approval_history.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 font-medium text-slate-900">History</h2>
-          <ul className="space-y-3 text-sm">
-            {claim.approval_history.map((entry) => (
-              <li key={entry.approval_history_id} className="border-l-2 border-slate-200 pl-3">
-                <div className="font-medium text-slate-800">
-                  {entry.action} by {entry.action_by_name} ({entry.action_by})
-                </div>
-                <div className="text-slate-500">{formatDate(entry.action_date.slice(0, 10))}</div>
-                {entry.approved_amount && (
-                  <div className="text-slate-600">
-                    Approved amount: {formatCurrency(entry.approved_amount)}
-                  </div>
-                )}
-                {entry.remarks && <div className="text-slate-600">"{entry.remarks}"</div>}
-              </li>
-            ))}
-          </ul>
+          <h2 className="mb-4 font-medium text-slate-900">History</h2>
+          <ApprovalHistoryTimeline
+            entries={claim.approval_history}
+            renderActor={(entry) => (
+              <>
+                by {entry.action_by_name}{' '}
+                <span className="font-normal text-slate-400">({entry.action_by})</span>
+              </>
+            )}
+          />
         </div>
       )}
 

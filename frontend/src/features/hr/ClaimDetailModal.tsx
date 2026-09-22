@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { isAxiosError } from 'axios'
 
 import { downloadHRAttachment, getHRClaimDetail } from '../../api/hr'
+import { ApprovalHistoryTimeline } from '../../components/ApprovalHistoryTimeline'
 import { CollapsibleSection } from '../../components/CollapsibleSection'
 import { Modal } from '../../components/Modal'
 import { formatCurrency, formatDate, formatMonthYear } from '../../lib/format'
@@ -162,25 +163,16 @@ export function ClaimDetailModal({
 
           {claim.approval_history.length > 0 && (
             <div>
-              <h3 className="mb-2 text-sm font-medium text-slate-900">History</h3>
-              <ul className="space-y-3 text-sm">
-                {claim.approval_history.map((entry) => (
-                  <li key={entry.approval_history_id} className="border-l-2 border-slate-200 pl-3">
-                    <div className="font-medium text-slate-800">
-                      {entry.action} by {entry.action_by_name} ({entry.action_by})
-                    </div>
-                    <div className="text-slate-500">
-                      {formatDate(entry.action_date.slice(0, 10))}
-                    </div>
-                    {entry.approved_amount && (
-                      <div className="text-slate-600">
-                        Approved amount: {formatCurrency(entry.approved_amount)}
-                      </div>
-                    )}
-                    {entry.remarks && <div className="text-slate-600">"{entry.remarks}"</div>}
-                  </li>
-                ))}
-              </ul>
+              <h3 className="mb-3 text-sm font-medium text-slate-900">History</h3>
+              <ApprovalHistoryTimeline
+                entries={claim.approval_history}
+                renderActor={(entry) => (
+                  <>
+                    by {entry.action_by_name}{' '}
+                    <span className="font-normal text-slate-400">({entry.action_by})</span>
+                  </>
+                )}
+              />
             </div>
           )}
 

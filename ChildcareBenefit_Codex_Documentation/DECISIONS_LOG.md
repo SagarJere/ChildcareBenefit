@@ -677,3 +677,15 @@
     employee's own claim detail page deliberately shows "by HR"
     generically rather than naming the specific approver, which is an
     existing, intentional design choice left untouched.
+61. Approval history visual redesign (user direction 2026-09-22): the
+    plain bare-list "History" section (thin left border, stacked text)
+    was replaced everywhere it appears (HR claim detail page,
+    `ClaimDetailModal`, and the employee's own claim detail page) with a
+    new shared `ApprovalHistoryTimeline` component — an icon-and-color
+    coded vertical timeline (emerald check for Approved, red X for
+    Rejected, amber send icon for Sent Back, matching the colors
+    already used for those action buttons), action+date on one line
+    instead of stacked, and remarks in a quoted, subtly-shaded block.
+    Takes a `renderActor` render-prop so the HR views can show "by Name
+    (EmployeeID)" (item 60) while the employee view keeps its generic
+    "by HR".
