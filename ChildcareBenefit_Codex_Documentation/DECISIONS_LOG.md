@@ -654,3 +654,15 @@
     link wasn't obviously an action: the date now reads "Invoice date:
     …" instead of a bare unlabeled value, and each row has its own
     visible "View details →" link separate from the claim number text.
+59. Claims Summary Report detail popup (user direction 2026-09-22,
+    correcting item 58 — the actual target was HR → Reports → Claims
+    Summary, not the claim history modal): the report's "Date" column
+    header was renamed "Invoice Date" (the underlying value was already
+    `row.invoice_date`, per item 58's finding — only the header label
+    was generic), and each row now has a "View details" action opening
+    a new `ClaimDetailModal` — a read-only popup (not a page
+    navigation) showing the same sections as the full HR claim detail
+    page (invoice, documents, eligibility, payout schedule, approval
+    history) via the existing `getHRClaimDetail` endpoint, minus the
+    approve/reject/send-back controls, with an "Open full claim page"
+    link out to the real page for taking action.

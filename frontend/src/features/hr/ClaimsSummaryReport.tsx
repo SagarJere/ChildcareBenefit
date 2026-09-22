@@ -6,11 +6,13 @@ import { downloadReportCsv, getClaimsSummary, type ClaimsSummaryFilters } from '
 import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { ClaimStatusBadge } from '../claims/ClaimStatusBadge'
+import { ClaimDetailModal } from './ClaimDetailModal'
 
 const STATUS_OPTIONS = ['Draft', 'Submitted', 'Approved', 'Rejected', 'SentBack']
 
 export function ClaimsSummaryReport() {
   const [filters, setFilters] = useState<ClaimsSummaryFilters>({})
+  const [viewClaimId, setViewClaimId] = useState<number | null>(null)
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['report-claims-summary', filters],
@@ -128,11 +130,12 @@ export function ClaimsSummaryReport() {
                   <th className="px-4 py-3">Employee</th>
                   <th className="px-4 py-3">Child</th>
                   <th className="px-4 py-3">Invoice</th>
-                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Invoice Date</th>
                   <th className="px-4 py-3">Amount</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Submitted</th>
                   <th className="px-4 py-3">Approved</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -154,11 +157,20 @@ export function ClaimsSummaryReport() {
                     <td className="px-4 py-3 text-slate-500">
                       {row.approved_date ? formatDate(row.approved_date.slice(0, 10)) : '—'}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setViewClaimId(row.claim_id)}
+                        className="font-medium text-indigo-700 hover:underline"
+                      >
+                        View details
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 {data.rows.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={9} className="px-4 py-6 text-center text-slate-400">
                       No claims match these filters.
                     </td>
                   </tr>
@@ -167,6 +179,9 @@ export function ClaimsSummaryReport() {
             </table>
           </div>
         </>
+      )}
+      {viewClaimId !== null && (
+        <ClaimDetailModal claimId={viewClaimId} onClose={() => setViewClaimId(null)} />
       )}
     </div>
   )
