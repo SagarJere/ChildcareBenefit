@@ -3,6 +3,8 @@ import { Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { downloadReportCsv, getPayoutReport, type PayoutReportFilters } from '../../api/reports'
+import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
+import { FinancialYearSelect } from '../../components/FinancialYearSelect'
 import { PayoutReportTable } from '../../components/PayoutReportTable'
 import { formatCurrency } from '../../lib/format'
 
@@ -17,35 +19,22 @@ export function PayoutReport() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-        <div>
-          <label htmlFor="payoutFyFilter" className="block text-xs font-medium text-slate-500">
-            Financial year
-          </label>
-          <input
-            id="payoutFyFilter"
-            type="text"
-            placeholder="e.g. 2026-27"
-            value={filters.financial_year ?? ''}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, financial_year: e.target.value || undefined }))
-            }
-            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label htmlFor="payoutEmployeeFilter" className="block text-xs font-medium text-slate-500">
-            Employee ID
-          </label>
-          <input
-            id="payoutEmployeeFilter"
-            type="text"
-            value={filters.employee_id ?? ''}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, employee_id: e.target.value || undefined }))
-            }
-            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
+        <FinancialYearSelect
+          id="payoutFyFilter"
+          label="Financial year"
+          value={filters.financial_year ?? ''}
+          onChange={(financial_year) =>
+            setFilters((f) => ({ ...f, financial_year: financial_year || undefined }))
+          }
+        />
+        <EmployeeAutocomplete
+          id="payoutEmployeeFilter"
+          label="Employee"
+          value={filters.employee_id ?? ''}
+          onChange={(employee_id) =>
+            setFilters((f) => ({ ...f, employee_id: employee_id || undefined }))
+          }
+        />
         <div>
           <label htmlFor="payoutChildFilter" className="block text-xs font-medium text-slate-500">
             Child ID

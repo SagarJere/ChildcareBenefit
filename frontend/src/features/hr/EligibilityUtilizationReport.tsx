@@ -7,6 +7,8 @@ import {
   getEligibilityUtilization,
   type EligibilityUtilizationFilters,
 } from '../../api/reports'
+import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
+import { FinancialYearSelect } from '../../components/FinancialYearSelect'
 import { formatCurrency } from '../../lib/format'
 
 export function EligibilityUtilizationReport() {
@@ -20,35 +22,22 @@ export function EligibilityUtilizationReport() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-        <div>
-          <label htmlFor="fyFilter" className="block text-xs font-medium text-slate-500">
-            Financial year
-          </label>
-          <input
-            id="fyFilter"
-            type="text"
-            placeholder="e.g. 2026-27"
-            value={filters.financial_year ?? ''}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, financial_year: e.target.value || undefined }))
-            }
-            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
-        <div>
-          <label htmlFor="employeeFilterUtil" className="block text-xs font-medium text-slate-500">
-            Employee ID
-          </label>
-          <input
-            id="employeeFilterUtil"
-            type="text"
-            value={filters.employee_id ?? ''}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, employee_id: e.target.value || undefined }))
-            }
-            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
+        <FinancialYearSelect
+          id="fyFilter"
+          label="Financial year"
+          value={filters.financial_year ?? ''}
+          onChange={(financial_year) =>
+            setFilters((f) => ({ ...f, financial_year: financial_year || undefined }))
+          }
+        />
+        <EmployeeAutocomplete
+          id="employeeFilterUtil"
+          label="Employee"
+          value={filters.employee_id ?? ''}
+          onChange={(employee_id) =>
+            setFilters((f) => ({ ...f, employee_id: employee_id || undefined }))
+          }
+        />
         <button
           type="button"
           onClick={() =>

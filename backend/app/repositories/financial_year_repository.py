@@ -6,6 +6,17 @@ from app.models.financial_year import FinancialYearMaster
 from app.services.eligibility_calculator import FinancialYearWindow
 
 
+def list_all(db: Session) -> list[FinancialYearMaster]:
+    """Every financial year that has ever been touched (rows are
+    get-or-created lazily — see get_or_create), most recent first. Feeds
+    the HR reports' financial-year filter dropdown."""
+    return list(
+        db.execute(select(FinancialYearMaster).order_by(FinancialYearMaster.StartDate.desc()))
+        .scalars()
+        .all()
+    )
+
+
 def get_or_create(db: Session, fy: FinancialYearWindow) -> FinancialYearMaster:
     existing = db.execute(
         select(FinancialYearMaster).where(FinancialYearMaster.FinancialYear == fy.label)

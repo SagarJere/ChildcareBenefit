@@ -3,6 +3,7 @@ import { Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { downloadReportCsv, getClaimsSummary, type ClaimsSummaryFilters } from '../../api/reports'
+import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { ClaimStatusBadge } from '../claims/ClaimStatusBadge'
 
@@ -61,20 +62,14 @@ export function ClaimsSummaryReport() {
             ))}
           </select>
         </div>
-        <div>
-          <label htmlFor="employeeFilter" className="block text-xs font-medium text-slate-500">
-            Employee ID
-          </label>
-          <input
-            id="employeeFilter"
-            type="text"
-            value={filters.employee_id ?? ''}
-            onChange={(e) =>
-              setFilters((f) => ({ ...f, employee_id: e.target.value || undefined }))
-            }
-            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
-          />
-        </div>
+        <EmployeeAutocomplete
+          id="employeeFilter"
+          label="Employee"
+          value={filters.employee_id ?? ''}
+          onChange={(employee_id) =>
+            setFilters((f) => ({ ...f, employee_id: employee_id || undefined }))
+          }
+        />
         <button
           type="button"
           onClick={() =>

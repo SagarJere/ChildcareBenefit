@@ -26,6 +26,25 @@ def test_reports_require_hr_authorization(login_as) -> None:
     assert client.get("/api/v1/hr/reports/claims-summary").status_code == 403
     assert client.get("/api/v1/hr/reports/eligibility-utilization").status_code == 403
     assert client.get("/api/v1/hr/reports/headcount").status_code == 403
+    assert client.get("/api/v1/hr/financial-years").status_code == 403
+
+
+def test_financial_years_lists_years_that_have_data(
+    login_as, make_hr_approver, make_employee
+) -> None:
+    claimant = login_as(memp_id=940009, employee_id="94000009", Joindate=datetime(2018, 1, 1))
+    _add_child(claimant, "Report Kid FY", "2026-03-01")
+
+    make_employee(memp_id=940010, employee_id="94000010", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("94000010")
+    _login_as_existing(claimant, "94000010")
+    hr_client = claimant
+
+    response = hr_client.get("/api/v1/hr/financial-years")
+    assert response.status_code == 200
+    years = response.json()
+    assert isinstance(years, list)
+    assert "2026-27" in years
 
 
 def test_claims_summary_reflects_filters_and_totals(

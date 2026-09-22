@@ -629,3 +629,17 @@
     figure (RemainingAmount is Allotted minus Approved only — see
     `eligibility_repository.update_balance` — so it was already
     unaffected).
+57. Report filter usability (user direction 2026-09-22): the financial
+    year and employee filters on the HR Payout, Eligibility Utilization,
+    and Claims Summary reports were free-text inputs (a placeholder like
+    "e.g. 2026-27", or a raw Employee ID with no lookup). Replaced with
+    two new shared components: `FinancialYearSelect` (a dropdown backed
+    by a new `GET /hr/financial-years` endpoint, listing every FY that
+    actually has data — `Childcare_FinancialYearMaster` rows are
+    get-or-created lazily, so this can't just be a generated year range)
+    and `EmployeeAutocomplete` (a name/ID search dropdown, reusing the
+    same public `/auth/active-employees` list the login page's
+    autocomplete already uses — see item 42 — rather than adding a new
+    HR-only employee-search endpoint). Typing a raw Employee ID directly
+    still works in the autocomplete field; the dropdown is just a faster
+    way to find one by name.

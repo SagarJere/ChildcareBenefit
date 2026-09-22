@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.csv_response import csv_response as _csv_response
 from app.database.session import get_db
 from app.dependencies.auth import get_current_hr_approver
+from app.repositories import financial_year_repository
 from app.schemas.employee import EmployeeProfile
 from app.schemas.reports import (
     ClaimsSummaryResponse,
@@ -17,6 +18,16 @@ from app.schemas.reports import (
 from app.services import report_service
 
 router = APIRouter()
+
+
+@router.get("/hr/financial-years", response_model=list[str])
+def financial_years(
+    current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    """Feeds the HR reports' financial-year filter dropdown — every FY
+    label that actually has data, most recent first."""
+    return [fy.FinancialYear for fy in financial_year_repository.list_all(db)]
 
 
 @router.get("/hr/reports/claims-summary", response_model=None)

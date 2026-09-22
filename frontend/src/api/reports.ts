@@ -130,6 +130,13 @@ export async function getHeadcount(): Promise<HeadcountResponse> {
   return data
 }
 
+/** Every financial year that has data, most recent first — feeds the
+ * reports' financial-year filter dropdown. */
+export async function getFinancialYears(): Promise<string[]> {
+  const { data } = await apiClient.get<string[]>('/hr/financial-years')
+  return data
+}
+
 export async function getPayoutReport(filters: PayoutReportFilters): Promise<PayoutReportResponse> {
   const { data } = await apiClient.get<PayoutReportResponse>('/hr/reports/payout', {
     params: filters,
