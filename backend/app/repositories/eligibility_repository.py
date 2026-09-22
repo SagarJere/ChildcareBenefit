@@ -81,11 +81,16 @@ def get_by_id_for_update(db: Session, eligibility_id: int) -> EligibilityMaster 
     """Row-locked lookup for the balance-check-then-update sequence in HR
     approval (see DECISIONS_LOG.md item 44) — guards against two
     concurrent approvals both reading the same stale RemainingAmount and
-    together over-spending the child's financial-year balance."""
+    together over-spending the child's financial-year balance.
+
+    Uses an explicit `WITH (UPDLOCK, ROWLOCK)` table hint via `with_hint`,
+    not SQLAlchemy's generic `.with_for_update()` — the mssql dialect
+    silently does not translate that into any lock hint at all, so it was
+    previously a no-op (see DECISIONS_LOG.md item 55)."""
     return db.execute(
         select(EligibilityMaster)
         .where(EligibilityMaster.EligibilityID == eligibility_id)
-        .with_for_update()
+        .with_hint(EligibilityMaster, "WITH (UPDLOCK, ROWLOCK)", "mssql")
     ).scalar_one_or_none()
 
 

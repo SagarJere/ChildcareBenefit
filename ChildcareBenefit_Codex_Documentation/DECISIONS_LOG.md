@@ -549,3 +549,60 @@
     built with responsive patterns (`overflow-x-auto` on every table,
     `flex-wrap` on filter/button rows, `sm:`-prefixed grid columns) from
     earlier increments, so no other changes were needed.
+54. Cross-user cache leak on sign-out (user-reported 2026-09-22):
+    `AuthProvider.signOut` only removed the `['me']` query from the
+    TanStack Query cache — every other query (children, claims, payout
+    reports, HR queue, HR reports, ...) is keyed independently of who's
+    signed in, so it survived a logout untouched. In the same browser
+    tab, logging in as a different user without a full page reload could
+    briefly (or longer, if a request from the outgoing session was still
+    in flight) show the previous user's cached data. Fixed by having
+    `signOut` call `queryClient.cancelQueries()` then `queryClient.
+    clear()` — cancel first so a slow in-flight request from the
+    outgoing session can't write stale data back into the cache after
+    it's been cleared.
+55. Claim double-approval race (user-reported 2026-09-22, live on
+    production): HR reported approving a claim once but seeing its
+    payout calculated twice, attributed to the free-tier DB being slow.
+    Root cause: `hr_service._require_reviewable_claim` read
+    `ClaimStatus` with a plain, unlocked `SELECT` before either the
+    status check or the write — two concurrent approve requests for the
+    *same* claim (a slow request plus a retry/double-click) could both
+    read "Submitted" before either committed, and both proceed: two
+    `ClaimApprovalHistory` "Approved" rows, and `payout_service.
+    recalculate_payout` (which sources approved claims from that history
+    table) counted the claim's amount twice. Fixed by adding
+    `claim_repository.get_claim_by_id_for_update` (row-locked) and using
+    it in `_require_reviewable_claim`, so a second concurrent
+    approve/reject/send-back blocks until the first commits, then
+    correctly sees the already-changed status and is rejected.
+
+    While building this, discovered a much bigger problem: SQLAlchemy's
+    `.with_for_update()` silently generates *no lock hint at all* on the
+    mssql dialect (verified empirically — compiling the statement shows
+    a plain `SELECT`, and a two-session test confirmed a second session
+    acquired the "locked" row in 0.03s instead of blocking). This means
+    `eligibility_repository.get_by_id_for_update` — the item-44 lock
+    that was supposed to prevent concurrent approvals from over-spending
+    a child's balance — had *never* actually been locking anything since
+    it was written. Both repository functions were fixed to use
+    `.with_hint(Model, "WITH (UPDLOCK, ROWLOCK)", "mssql")` instead,
+    which a diagnostic script confirmed genuinely blocks (5s+ wait for
+    the second session, matching the timeout). Added
+    `tests/test_hr_concurrency.py`, a true two-connection/two-thread
+    test (the shared, single-connection `db_session` fixture every other
+    test uses can't exercise real row locking) — confirmed it fails
+    without the fix and passes with it.
+
+    Checked production for existing damage from this: found exactly one
+    corrupted claim (ClaimID 4, approved twice 32 seconds apart on
+    2026-09-21 — the user's actual incident), inflating its eligibility's
+    Utilized/Approved amount and September payout ledger entry from
+    ₹12,000 to ₹24,000. Repaired directly against the SmarterASP
+    database (with explicit user confirmation first): deleted the
+    duplicate `ClaimApprovalHistory` row, then re-ran
+    `eligibility_balance_service.sync_balance` and `payout_service.
+    recalculate_payout` for that eligibility — the same functions a
+    normal approval triggers — rather than hand-editing the derived
+    numbers. Verified the corrected ledger afterward. No other claim in
+    the database had this defect.

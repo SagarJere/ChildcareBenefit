@@ -13,7 +13,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(() => {
     clearStoredToken()
     setToken(null)
-    queryClient.removeQueries({ queryKey: ['me'] })
+    // Every cached query (children, claims, payout, HR reports, ...) is
+    // keyed independently of who's signed in, so without this a different
+    // user logging in in the same tab would briefly (or, for an in-flight
+    // request that resolves late, not-so-briefly) see the previous user's
+    // cached data. cancelQueries first so an in-flight request from the
+    // outgoing session can't write stale data back in after clear().
+    queryClient.cancelQueries()
+    queryClient.clear()
   }, [queryClient])
 
   const signIn = (nextToken: string, employee: EmployeeProfile) => {

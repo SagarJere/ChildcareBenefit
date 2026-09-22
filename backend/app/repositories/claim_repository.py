@@ -125,6 +125,28 @@ def get_claim_by_id(db: Session, claim_id: int) -> ClaimMaster | None:
     ).scalar_one_or_none()
 
 
+def get_claim_by_id_for_update(db: Session, claim_id: int) -> ClaimMaster | None:
+    """Row-locked lookup for the status-check-then-update sequence in HR
+    approve/reject/send-back. Without this, two concurrent requests for the
+    same claim (e.g. a slow request plus an impatient double-click) can
+    both read ClaimStatus == Submitted before either commits, and both
+    proceed — approving (or rejecting) the same claim twice, which for
+    Approve also double-counts it in the payout recalculation (see
+    DECISIONS_LOG.md item 55).
+
+    Uses an explicit `WITH (UPDLOCK, ROWLOCK)` table hint via `with_hint`,
+    not SQLAlchemy's generic `.with_for_update()` — the mssql dialect
+    silently does not translate that into any lock hint at all, making it
+    a no-op (discovered while building this fix; also true of
+    eligibility_repository.get_by_id_for_update's item-44 lock, fixed
+    alongside this one)."""
+    return db.execute(
+        select(ClaimMaster)
+        .where(ClaimMaster.ClaimID == claim_id)
+        .with_hint(ClaimMaster, "WITH (UPDLOCK, ROWLOCK)", "mssql")
+    ).scalar_one_or_none()
+
+
 def get_claims_for_hr(
     db: Session,
     status: str | None = None,

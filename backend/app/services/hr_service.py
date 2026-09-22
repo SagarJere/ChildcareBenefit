@@ -158,7 +158,11 @@ def get_claim_detail(db: Session, claim_id: int) -> HRClaimDetail:
 
 
 def _require_reviewable_claim(db: Session, claim_id: int) -> ClaimMaster:
-    claim = claim_repository.get_claim_by_id(db, claim_id)
+    # Row-locked: without this, two concurrent requests for the same claim
+    # (a slow request plus an impatient double-click, or a client retry)
+    # can both read ClaimStatus == Submitted before either commits, and
+    # both proceed — see DECISIONS_LOG.md item 55.
+    claim = claim_repository.get_claim_by_id_for_update(db, claim_id)
     if claim is None:
         raise ClaimNotFoundError(f"No claim {claim_id} found.")
     if claim.ClaimStatus != SUBMITTED:
