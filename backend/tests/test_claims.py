@@ -345,6 +345,8 @@ def test_employee_can_view_history_and_resubmit_a_sent_back_claim(
     assert body["claim_status"] == "SentBack"
     assert len(body["approval_history"]) == 1
     assert body["approval_history"][0]["action"] == "SentBack"
+    assert body["approval_history"][0]["action_by"] == "92000020"
+    assert body["approval_history"][0]["action_by_name"] == "Test Employee"
     assert body["approval_history"][0]["remarks"] == "Please attach a clearer invoice copy."
 
     # A SentBack claim can be corrected and resubmitted.

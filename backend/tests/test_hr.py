@@ -188,6 +188,7 @@ def test_hr_approve_claim_updates_status_and_history(
     entry = body["approval_history"][0]
     assert entry["action"] == "Approved"
     assert entry["action_by"] == "93000008"
+    assert entry["action_by_name"] == "Test Employee"
     assert entry["previous_status"] == "Submitted"
     assert entry["new_status"] == "Approved"
     assert float(entry["approved_amount"]) == 1800.00

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 class ApprovalHistoryEntry(BaseModel):
     approval_history_id: int
     action_by: str
+    action_by_name: str
     action: str
     previous_status: str
     new_status: str
@@ -21,10 +22,13 @@ class ApprovalHistoryEntry(BaseModel):
     action_date: datetime
 
     @classmethod
-    def from_orm_model(cls, entry: ClaimApprovalHistory) -> ApprovalHistoryEntry:
+    def from_orm_model(
+        cls, entry: ClaimApprovalHistory, *, action_by_name: str
+    ) -> ApprovalHistoryEntry:
         return cls(
             approval_history_id=entry.ApprovalHistoryID,
             action_by=entry.ActionBy,
+            action_by_name=action_by_name,
             action=entry.Action,
             previous_status=entry.PreviousStatus,
             new_status=entry.NewStatus,

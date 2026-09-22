@@ -140,7 +140,9 @@ def get_claim_detail(db: Session, claim_id: int) -> HRClaimDetail:
         for a in claim_attachment_repository.get_for_claim(db, claim.ClaimID)
     ]
     history = [
-        ApprovalHistoryEntry.from_orm_model(h)
+        ApprovalHistoryEntry.from_orm_model(
+            h, action_by_name=_employee_display_name(db, h.ActionBy)
+        )
         for h in claim_approval_history_repository.get_for_claim(db, claim.ClaimID)
     ]
     payout_schedule = [

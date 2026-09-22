@@ -49,6 +49,7 @@ from app.repositories import (
     claim_attachment_repository,
     claim_repository,
     eligibility_repository,
+    employee_repository,
     payout_repository,
 )
 from app.schemas.approval_history import ApprovalHistoryEntry
@@ -63,6 +64,13 @@ from app.services.storage import minio_client
 def _safe_filename(filename: str) -> str:
     base = filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
     return re.sub(r"[^A-Za-z0-9._-]", "_", base) or "file"
+
+
+def _employee_display_name(db: Session, employee_id: str) -> str:
+    employee = employee_repository.get_by_employee_id(db, employee_id)
+    if employee is not None and employee.FullName:
+        return employee.FullName
+    return employee_id
 
 
 def _resolve_eligibility_for_invoice(
@@ -111,7 +119,9 @@ def _to_response(db: Session, claim) -> ClaimResponse:
         for a in claim_attachment_repository.get_for_claim(db, claim.ClaimID)
     ]
     approval_history = [
-        ApprovalHistoryEntry.from_orm_model(h)
+        ApprovalHistoryEntry.from_orm_model(
+            h, action_by_name=_employee_display_name(db, h.ActionBy)
+        )
         for h in claim_approval_history_repository.get_for_claim(db, claim.ClaimID)
     ]
     payout_schedule = [

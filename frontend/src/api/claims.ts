@@ -15,6 +15,7 @@ export interface Attachment {
 export interface ApprovalHistoryEntry {
   approval_history_id: number
   action_by: string
+  action_by_name: string
   action: 'Approved' | 'Rejected' | 'SentBack'
   previous_status: string
   new_status: string

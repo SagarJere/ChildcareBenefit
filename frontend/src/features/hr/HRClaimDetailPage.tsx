@@ -263,7 +263,7 @@ export function HRClaimDetailPage() {
             {claim.approval_history.map((entry) => (
               <li key={entry.approval_history_id} className="border-l-2 border-slate-200 pl-3">
                 <div className="font-medium text-slate-800">
-                  {entry.action} by {entry.action_by}
+                  {entry.action} by {entry.action_by_name} ({entry.action_by})
                 </div>
                 <div className="text-slate-500">{formatDate(entry.action_date.slice(0, 10))}</div>
                 {entry.approved_amount && (

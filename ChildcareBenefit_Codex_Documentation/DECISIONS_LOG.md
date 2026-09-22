@@ -666,3 +666,14 @@
     history) via the existing `getHRClaimDetail` endpoint, minus the
     approve/reject/send-back controls, with an "Open full claim page"
     link out to the real page for taking action.
+60. Show approver's name alongside Employee ID in approval history
+    (user direction 2026-09-22): the "History" section on HR's claim
+    detail page (and the new `ClaimDetailModal` popup) showed only the
+    raw Employee ID for who took each action. `ApprovalHistoryEntry`
+    gained an `action_by_name` field, resolved via each service's
+    existing employee-name-lookup pattern (`hr_service._employee_
+    display_name`; added the same small helper to `claim_service.py`,
+    which didn't have one). Only the HR-facing views were changed — the
+    employee's own claim detail page deliberately shows "by HR"
+    generically rather than naming the specific approver, which is an
+    existing, intentional design choice left untouched.
