@@ -153,6 +153,8 @@ def get_claims_for_hr(
     *,
     employee_id: str | None = None,
     child_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[ClaimMaster]:
     stmt = select(ClaimMaster)
     if status is not None:
@@ -161,6 +163,10 @@ def get_claims_for_hr(
         stmt = stmt.where(ClaimMaster.EmployeeID == employee_id)
     if child_id is not None:
         stmt = stmt.where(ClaimMaster.ChildID == child_id)
+    if date_from is not None:
+        stmt = stmt.where(ClaimMaster.InvoiceDate >= date_from)
+    if date_to is not None:
+        stmt = stmt.where(ClaimMaster.InvoiceDate <= date_to)
     return list(db.execute(stmt.order_by(ClaimMaster.CreatedDate.desc())).scalars().all())
 
 

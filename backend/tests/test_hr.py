@@ -99,6 +99,27 @@ def test_hr_can_list_and_view_submitted_claim(
     assert body["approval_history"] == []
 
 
+def test_hr_list_filters_by_invoice_date_range(login_as, make_hr_approver, make_employee) -> None:
+    claimant = login_as(memp_id=930020, employee_id="93000020", Joindate=datetime(2018, 1, 1))
+    child_a = _add_child(claimant, "Kid HR Date A", "2026-03-01")
+    child_b = _add_child(claimant, "Kid HR Date B", "2026-04-01")
+    early_claim = _create_and_submit_claim(claimant, child_a["child_id"], invoice_date="2026-06-01")
+    late_claim = _create_and_submit_claim(claimant, child_b["child_id"], invoice_date="2026-09-01")
+
+    make_employee(memp_id=930021, employee_id="93000021", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("93000021")
+    _login_as_existing(claimant, "93000021")
+    hr_client = claimant
+
+    filtered = hr_client.get(
+        "/api/v1/hr/claims", params={"date_from": "2026-08-01", "date_to": "2026-09-30"}
+    )
+    assert filtered.status_code == 200
+    filtered_ids = {c["claim_id"] for c in filtered.json()}
+    assert late_claim["claim_id"] in filtered_ids
+    assert early_claim["claim_id"] not in filtered_ids
+
+
 def test_hr_list_filters_by_status(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=930005, employee_id="93000005", Joindate=datetime(2018, 1, 1))
     child = _add_child(claimant, "Kid HR Two", "2026-03-01")

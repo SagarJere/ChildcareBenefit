@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -30,10 +32,19 @@ def list_claims(
     status_filter: str | None = Query(default=None, alias="status"),
     employee_id: str | None = None,
     child_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
     db: Session = Depends(get_db),
 ) -> list[HRClaimSummary]:
-    return hr_service.list_claims(db, status_filter, employee_id=employee_id, child_id=child_id)
+    return hr_service.list_claims(
+        db,
+        status_filter,
+        employee_id=employee_id,
+        child_id=child_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
 
 
 @router.get("/hr/claims/{claim_id}", response_model=HRClaimDetail)

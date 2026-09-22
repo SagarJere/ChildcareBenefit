@@ -4,17 +4,29 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { listHRClaims } from '../../api/hr'
+import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
 import { ClaimStatusBadge } from '../claims/ClaimStatusBadge'
 import { formatCurrency, formatDate } from '../../lib/format'
 
 const STATUS_TABS = ['Submitted', 'Approved', 'Rejected', 'SentBack', 'All'] as const
 
+interface OtherFilters {
+  employee_id?: string
+  date_from?: string
+  date_to?: string
+}
+
 export function HRClaimsPage() {
   const [statusTab, setStatusTab] = useState<(typeof STATUS_TABS)[number]>('Submitted')
+  const [otherFilters, setOtherFilters] = useState<OtherFilters>({})
 
   const { data: claims, isPending, isError } = useQuery({
-    queryKey: ['hr-claims', statusTab],
-    queryFn: () => listHRClaims(statusTab === 'All' ? {} : { status: statusTab }),
+    queryKey: ['hr-claims', statusTab, otherFilters],
+    queryFn: () =>
+      listHRClaims({
+        ...(statusTab === 'All' ? {} : { status: statusTab }),
+        ...otherFilters,
+      }),
   })
 
   return (
@@ -39,6 +51,54 @@ export function HRClaimsPage() {
             {tab === 'SentBack' ? 'Sent Back' : tab}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+        <EmployeeAutocomplete
+          id="hrQueueEmployeeFilter"
+          label="Employee"
+          value={otherFilters.employee_id ?? ''}
+          onChange={(employee_id) =>
+            setOtherFilters((f) => ({ ...f, employee_id: employee_id || undefined }))
+          }
+        />
+        <div>
+          <label htmlFor="hrQueueDateFrom" className="block text-xs font-medium text-slate-500">
+            Invoice from
+          </label>
+          <input
+            id="hrQueueDateFrom"
+            type="date"
+            value={otherFilters.date_from ?? ''}
+            onChange={(e) =>
+              setOtherFilters((f) => ({ ...f, date_from: e.target.value || undefined }))
+            }
+            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor="hrQueueDateTo" className="block text-xs font-medium text-slate-500">
+            Invoice to
+          </label>
+          <input
+            id="hrQueueDateTo"
+            type="date"
+            value={otherFilters.date_to ?? ''}
+            onChange={(e) =>
+              setOtherFilters((f) => ({ ...f, date_to: e.target.value || undefined }))
+            }
+            className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+          />
+        </div>
+        {(otherFilters.employee_id || otherFilters.date_from || otherFilters.date_to) && (
+          <button
+            type="button"
+            onClick={() => setOtherFilters({})}
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Clear filters
+          </button>
+        )}
       </div>
 
       {isPending && (
@@ -70,7 +130,7 @@ export function HRClaimsPage() {
                 <th className="px-4 py-3">Employee</th>
                 <th className="px-4 py-3">Child</th>
                 <th className="px-4 py-3">Invoice</th>
-                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Invoice Date</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
               </tr>

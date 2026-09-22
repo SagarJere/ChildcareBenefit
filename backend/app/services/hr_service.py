@@ -84,6 +84,8 @@ def list_claims(
     *,
     employee_id: str | None = None,
     child_id: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[HRClaimSummary]:
     """Batches the employee-name and child lookups (one query each for the
     whole list) rather than querying per claim — this endpoint's result
@@ -92,9 +94,16 @@ def list_claims(
 
     `employee_id`/`child_id` are used by the claim detail page's "claim
     history" popup, to show every other claim for the same employee+child
-    without mixing in the employee's other children's claims."""
+    without mixing in the employee's other children's claims. `date_from`/
+    `date_to` filter by invoice date, matching the Claims Summary Report's
+    date filter semantics."""
     claims = claim_repository.get_claims_for_hr(
-        db, status, employee_id=employee_id, child_id=child_id
+        db,
+        status,
+        employee_id=employee_id,
+        child_id=child_id,
+        date_from=date_from,
+        date_to=date_to,
     )
 
     child_by_id = {child.ChildID: child for child in child_repository.get_all_active_children(db)}

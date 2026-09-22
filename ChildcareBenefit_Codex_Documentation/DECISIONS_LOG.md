@@ -689,3 +689,15 @@
     Takes a `renderActor` render-prop so the HR views can show "by Name
     (EmployeeID)" (item 60) while the employee view keeps its generic
     "by HR".
+62. HR Queue filters (user direction 2026-09-22): the Claim Approval
+    Queue only had status tabs. Added an Employee filter (reusing
+    `EmployeeAutocomplete`) and an invoice date range (from/to,
+    matching the Claims Summary Report's date-filter semantics) below
+    the status tabs, plus a "Clear filters" button that appears once
+    any are set. Required adding `date_from`/`date_to` support to
+    `GET /hr/claims` all the way down (`claim_repository.
+    get_claims_for_hr` → `hr_service.list_claims` → the endpoint),
+    filtering by `ClaimMaster.InvoiceDate` — this endpoint previously
+    only supported status/employee_id/child_id. Also renamed its
+    "Date" column to "Invoice Date" for consistency with the reports
+    (item 59).
