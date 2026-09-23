@@ -81,7 +81,9 @@ def test_create_claim_fails_without_eligibility_for_invoice_period(login_as) -> 
 
 def test_create_claim_defaults_claim_amount_to_invoice_amount(login_as) -> None:
     client = login_as(memp_id=920003, employee_id="92000003", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), since claims can't be raised within it.
+    child = _add_child(client, "Kid Three", "2024-06-01")
 
     response = client.post(
         "/api/v1/claims",
@@ -99,29 +101,9 @@ def test_create_claim_defaults_claim_amount_to_invoice_amount(login_as) -> None:
     assert float(body["claim_amount"]) == 2500.50
     assert float(body["invoice_amount"]) == 2500.50
     assert body["attachments"] == []
-    # Child born March 2026, invoice dated August 2026 -> month 6, no docs.
-    assert body["requires_documents"] is False
-
-
-def test_submit_claim_succeeds_without_documents_in_first_twelve_months(login_as) -> None:
-    client = login_as(memp_id=920004, employee_id="92000004", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Four", "2026-03-01")
-    claim = client.post(
-        "/api/v1/claims",
-        json={
-            "child_id": child["child_id"],
-            "invoice_date": "2026-08-01",
-            "invoice_number": "INV-4",
-            "invoice_amount": "1000.00",
-        },
-    ).json()
-
-    response = client.post(f"/api/v1/claims/{claim['claim_id']}/submit")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["claim_status"] == "Submitted"
-    assert body["submitted_date"] is not None
+    # Child born June 2024, invoice dated August 2026 -> month 27, docs
+    # informational (see the dedicated month-13+ tests for that flag).
+    assert body["requires_documents"] is True
 
 
 def test_submit_claim_succeeds_for_month_thirteen_plus_without_documents(login_as) -> None:
@@ -190,7 +172,7 @@ def test_submit_claim_succeeds_for_month_thirteen_plus_with_both_documents(
 
 def test_create_claim_rejects_duplicate_invoice_number(login_as) -> None:
     client = login_as(memp_id=920014, employee_id="92000014", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Fourteen", "2026-03-01")
+    child = _add_child(client, "Kid Fourteen", "2024-06-01")
     payload = {
         "child_id": child["child_id"],
         "invoice_date": "2026-08-01",
@@ -207,7 +189,7 @@ def test_create_claim_rejects_duplicate_invoice_number(login_as) -> None:
 
 def test_update_claim_rejects_duplicate_invoice_number_from_another_claim(login_as) -> None:
     client = login_as(memp_id=920015, employee_id="92000015", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Fifteen", "2026-03-01")
+    child = _add_child(client, "Kid Fifteen", "2024-06-01")
     client.post(
         "/api/v1/claims",
         json={
@@ -242,7 +224,7 @@ def test_update_claim_rejects_duplicate_invoice_number_from_another_claim(login_
 def test_update_claim_keeps_its_own_invoice_number(login_as) -> None:
     """A claim being edited must not be flagged as a duplicate of itself."""
     client = login_as(memp_id=920016, employee_id="92000016", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Sixteen", "2026-03-01")
+    child = _add_child(client, "Kid Sixteen", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -268,7 +250,7 @@ def test_update_claim_keeps_its_own_invoice_number(login_as) -> None:
 
 def test_create_claim_stores_optional_comments(login_as) -> None:
     client = login_as(memp_id=920017, employee_id="92000017", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Seventeen", "2026-03-01")
+    child = _add_child(client, "Kid Seventeen", "2024-06-01")
 
     response = client.post(
         "/api/v1/claims",
@@ -287,7 +269,7 @@ def test_create_claim_stores_optional_comments(login_as) -> None:
 
 def test_create_claim_comments_default_to_none(login_as) -> None:
     client = login_as(memp_id=920018, employee_id="92000018", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Eighteen", "2026-03-01")
+    child = _add_child(client, "Kid Eighteen", "2024-06-01")
 
     response = client.post(
         "/api/v1/claims",
@@ -310,7 +292,7 @@ def test_employee_can_view_history_and_resubmit_a_sent_back_claim(
     remarks/history on their own claim, and correct + resubmit a claim
     HR sent back."""
     claimant = login_as(memp_id=920019, employee_id="92000019", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid Nineteen", "2026-03-01")
+    child = _add_child(claimant, "Kid Nineteen", "2024-06-01")
     claim = claimant.post(
         "/api/v1/claims",
         json={
@@ -368,7 +350,7 @@ def test_employee_can_view_history_and_resubmit_a_sent_back_claim(
 
 def test_update_claim_rejected_once_submitted(login_as) -> None:
     client = login_as(memp_id=920007, employee_id="92000007", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Seven", "2026-03-01")
+    child = _add_child(client, "Kid Seven", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -394,7 +376,7 @@ def test_update_claim_rejected_once_submitted(login_as) -> None:
 
 def test_list_claims_returns_only_own_claims(login_as, make_employee) -> None:
     client = login_as(memp_id=920008, employee_id="92000008", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Eight", "2026-03-01")
+    child = _add_child(client, "Kid Eight", "2024-06-01")
     client.post(
         "/api/v1/claims",
         json={
@@ -416,7 +398,7 @@ def test_list_claims_returns_only_own_claims(login_as, make_employee) -> None:
 
 def test_upload_attachment_rejects_invalid_extension(login_as) -> None:
     client = login_as(memp_id=920010, employee_id="92000010", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Ten", "2026-03-01")
+    child = _add_child(client, "Kid Ten", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -439,7 +421,7 @@ def test_upload_attachment_rejects_invalid_extension(login_as) -> None:
 
 def test_upload_attachment_rejects_oversized_file(login_as) -> None:
     client = login_as(memp_id=920011, employee_id="92000011", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Eleven", "2026-03-01")
+    child = _add_child(client, "Kid Eleven", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -464,7 +446,7 @@ def test_upload_attachment_accepts_file_just_under_the_limit(
     login_as, minio_required, db_session: Session
 ) -> None:
     client = login_as(memp_id=920014, employee_id="92000014", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Fourteen", "2026-03-01")
+    child = _add_child(client, "Kid Fourteen", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -494,7 +476,7 @@ def test_upload_attachment_accepts_file_just_under_the_limit(
 
 def test_upload_attachment_rejected_once_submitted(login_as) -> None:
     client = login_as(memp_id=920012, employee_id="92000012", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Twelve", "2026-03-01")
+    child = _add_child(client, "Kid Twelve", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={
@@ -519,7 +501,7 @@ def test_upload_and_download_attachment_with_real_minio(
     login_as, minio_required, db_session: Session
 ) -> None:
     client = login_as(memp_id=920013, employee_id="92000013", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Kid Thirteen", "2026-03-01")
+    child = _add_child(client, "Kid Thirteen", "2024-06-01")
     claim = client.post(
         "/api/v1/claims",
         json={

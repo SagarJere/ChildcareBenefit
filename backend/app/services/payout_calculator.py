@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
-from app.services.eligibility_calculator import MONTHLY_BENEFIT_AMOUNT
+from app.services.eligibility_calculator import MONTHLY_BENEFIT_AMOUNT, is_first_year_payout_month
 
 
 def _month_start(d: date) -> date:
@@ -65,6 +65,7 @@ class MonthlyLedgerEntry:
     entitlement_amount: Decimal
     opening_balance: Decimal
     total_available_amount: Decimal
+    first_year_payout_amount: Decimal
     claim_allocated_amount: Decimal
     carry_forward_amount: Decimal
 
@@ -88,12 +89,23 @@ class PayoutCapacityExceededError(Exception):
 
 def calculate_payout_schedule(
     *,
+    child_dob: date,
     eligibility_start_date: date,
     eligibility_end_date: date,
     approved_claims: list[ApprovedClaimInput],
 ) -> PayoutScheduleResult:
     """Computes the monthly payout ledger and per-claim allocation for one
     child's one financial year of eligibility.
+
+    The child's first 13 months of life (user direction 2026-09-22) are
+    paid automatically — each such month's full entitlement goes to
+    `first_year_payout_amount`, with no claim involved and no carry-
+    forward interaction with the claim-driven months that follow. Since
+    child age only increases with calendar time, these first-year months
+    are always a prefix of this eligibility window's months (never
+    interleaved with claimable ones), so the claim-driven pointer/
+    carry-forward mechanics below run unmodified, just scoped to the
+    remaining "claimable" months.
 
     Claims are processed in chronological order of `approved_at`
     (PAYOUT_REQUIREMENTS.md §5). Each claim first "catches up" — consuming
@@ -104,10 +116,15 @@ def calculate_payout_schedule(
     one at a time (§4), each such future month getting its own row.
     """
     months = eligible_months_between(eligibility_start_date, eligibility_end_date)
+    first_year_months = {
+        month for month in months if is_first_year_payout_month(child_dob=child_dob, month=month)
+    }
+    claimable_months = [month for month in months if month not in first_year_months]
+
     # Tracks each origin month's remaining *physical* capacity, purely to
     # know how much can still be drawn from it — not what gets displayed
     # against that month in the ledger (see below).
-    remaining_by_month = {month: MONTHLY_BENEFIT_AMOUNT for month in months}
+    remaining_by_month = {month: MONTHLY_BENEFIT_AMOUNT for month in claimable_months}
     allocations: list[PayoutAllocationEntry] = []
 
     # The earliest month that might still have unconsumed capacity —
@@ -118,15 +135,15 @@ def calculate_payout_schedule(
     for claim in sorted(approved_claims, key=lambda c: (c.approved_at, c.claim_id)):
         remaining = claim.approved_amount
         sequence = 0
-        approval_month_index = _clamp_month_index(months, claim.approved_at.date())
+        approval_month_index = _clamp_month_index(claimable_months, claim.approved_at.date())
 
         # Phase 1: "catch up" — bundle everything from the current
         # pointer through the claim's own approval month into one row
         # dated at the approval month.
         catchup_amount = Decimal("0")
-        catchup_month = months[approval_month_index]
+        catchup_month = claimable_months[approval_month_index]
         while pointer <= approval_month_index and remaining > 0:
-            month = months[pointer]
+            month = claimable_months[pointer]
             take = min(remaining_by_month[month], remaining)
             remaining_by_month[month] -= take
             remaining -= take
@@ -148,14 +165,14 @@ def calculate_payout_schedule(
 
         # Phase 2: spill into strictly future months, one row each.
         while remaining > 0:
-            if pointer >= len(months):
+            if pointer >= len(claimable_months):
                 raise PayoutCapacityExceededError(
                     f"Claim {claim.claim_id} needs {remaining} more than this "
                     "child's financial year has remaining eligible-month "
                     "capacity for — this should be unreachable if HR approval "
                     "was correctly capped at the eligibility's RemainingAmount."
                 )
-            month = months[pointer]
+            month = claimable_months[pointer]
             take = min(remaining_by_month[month], remaining)
             remaining_by_month[month] -= take
             remaining -= take
@@ -182,13 +199,26 @@ def calculate_payout_schedule(
     # into September's unconsumed 5,000 — that reach-back is billed to
     # the later claim's own approval month instead (PAYOUT_REQUIREMENTS.md
     # §4-5's worked examples).
-    allocated_by_month = {month: Decimal("0") for month in months}
+    allocated_by_month = {month: Decimal("0") for month in claimable_months}
     for entry in allocations:
         allocated_by_month[entry.month] += entry.allocated_amount
 
     ledger = []
     opening = Decimal("0")
     for month in months:
+        if month in first_year_months:
+            ledger.append(
+                MonthlyLedgerEntry(
+                    month=month,
+                    entitlement_amount=MONTHLY_BENEFIT_AMOUNT,
+                    opening_balance=Decimal("0"),
+                    total_available_amount=MONTHLY_BENEFIT_AMOUNT,
+                    first_year_payout_amount=MONTHLY_BENEFIT_AMOUNT,
+                    claim_allocated_amount=Decimal("0"),
+                    carry_forward_amount=Decimal("0"),
+                )
+            )
+            continue
         available = opening + MONTHLY_BENEFIT_AMOUNT
         allocated = allocated_by_month[month]
         closing = available - allocated
@@ -198,6 +228,7 @@ def calculate_payout_schedule(
                 entitlement_amount=MONTHLY_BENEFIT_AMOUNT,
                 opening_balance=opening,
                 total_available_amount=available,
+                first_year_payout_amount=Decimal("0"),
                 claim_allocated_amount=allocated,
                 carry_forward_amount=closing,
             )

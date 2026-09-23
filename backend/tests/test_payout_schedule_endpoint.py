@@ -59,7 +59,10 @@ def test_payout_schedule_shows_full_ledger_including_zero_months(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=980004, employee_id="98000004", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Ledger Kid Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Ledger Kid Three", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
     allotted_months = child["eligibility"]["eligible_months"]
 

@@ -23,6 +23,7 @@ class TestEligibleMonthsBetween:
 class TestNoClaims:
     def test_entitlement_accrues_and_fully_carries_forward(self) -> None:
         result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 4, 1),
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[],
@@ -39,6 +40,7 @@ class TestNoClaims:
 class TestSingleClaimWithinOneMonth:
     def test_claim_smaller_than_first_month_entitlement(self) -> None:
         result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
@@ -62,6 +64,7 @@ class TestFutureMonthAllocation:
 
     def test_single_claim_with_no_prior_competition_spills_forward(self) -> None:
         result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
@@ -95,6 +98,7 @@ class TestFullBusinessExampleFromSpec:
 
     def _schedule(self):
         return calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
@@ -172,11 +176,13 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
         in_order = list(reversed(out_of_order))
 
         result_a = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=out_of_order,
         )
         result_b = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=in_order,
@@ -188,6 +194,7 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
 class TestEligibilityBoundary:
     def test_claim_exactly_exhausts_all_remaining_capacity(self) -> None:
         result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2027, 1, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
@@ -209,6 +216,7 @@ class TestEligibilityBoundary:
         dropping money if that invariant is ever violated."""
         with pytest.raises(PayoutCapacityExceededError):
             calculate_payout_schedule(
+                child_dob=date(2015, 1, 1),
                 eligibility_start_date=date(2027, 1, 1),
                 eligibility_end_date=date(2027, 3, 31),
                 approved_claims=[
@@ -222,6 +230,7 @@ class TestEligibilityBoundary:
 
     def test_single_eligible_month_child_close_to_six_year_cutoff(self) -> None:
         result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 6, 1),
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[
@@ -232,6 +241,74 @@ class TestEligibilityBoundary:
         )
         assert result.allocations == [_alloc(1, date(2026, 6, 1), 14000, 1)]
         assert len(result.ledger) == 1
+
+
+class TestFirstYearPayout:
+    """User direction 2026-09-22: a child's first 13 months of life are
+    paid automatically, with no claim involved."""
+
+    def test_entire_window_within_first_thirteen_months_is_fully_auto_paid(self) -> None:
+        # child_dob's month is month 1; the window runs exactly through
+        # month 13 (Jan 2026 - Jan 2027).
+        result = calculate_payout_schedule(
+            child_dob=date(2026, 1, 1),
+            eligibility_start_date=date(2026, 1, 1),
+            eligibility_end_date=date(2027, 1, 31),
+            approved_claims=[],
+        )
+        assert result.allocations == []
+        assert len(result.ledger) == 13
+        for entry in result.ledger:
+            assert entry.first_year_payout_amount == 14000
+            assert entry.claim_allocated_amount == 0
+            assert entry.opening_balance == 0
+            assert entry.total_available_amount == 14000
+            assert entry.carry_forward_amount == 0
+
+    def test_window_spanning_the_first_year_boundary_splits_cleanly(self) -> None:
+        # child_dob's month is month 1 = Jul 2025, so month 13 = Jul 2026
+        # and month 14 = Aug 2026. Window: May 2026 (month 11) through
+        # Oct 2026 (month 16) — 3 first-year months, 3 claimable months.
+        result = calculate_payout_schedule(
+            child_dob=date(2025, 7, 1),
+            eligibility_start_date=date(2026, 5, 1),
+            eligibility_end_date=date(2026, 10, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 8, 15)
+                )
+            ],
+        )
+        by_month = {entry.month: entry for entry in result.ledger}
+
+        for month in (date(2026, 5, 1), date(2026, 6, 1), date(2026, 7, 1)):
+            assert by_month[month].first_year_payout_amount == 14000
+            assert by_month[month].claim_allocated_amount == 0
+            assert by_month[month].opening_balance == 0
+            assert by_month[month].carry_forward_amount == 0
+
+        # The first claimable month (Aug) starts fresh at opening=0 —
+        # nothing carries over from the first-year months.
+        august = by_month[date(2026, 8, 1)]
+        assert august.first_year_payout_amount == 0
+        assert august.opening_balance == 0
+        assert august.claim_allocated_amount == 9000
+        assert august.carry_forward_amount == 5000
+
+        assert result.allocations == [_alloc(1, date(2026, 8, 1), 9000, 1)]
+
+    def test_child_already_past_month_thirteen_has_no_first_year_months(self) -> None:
+        # Mirrors the "employee joined late" case: by the time eligibility
+        # begins the child is already well past month 13, so nothing is
+        # auto-paid — this falls out of the month check naturally, no
+        # special case needed.
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[],
+        )
+        assert all(entry.first_year_payout_amount == 0 for entry in result.ledger)
 
 
 def _alloc(claim_id: int, month: date, amount: int, sequence: int):

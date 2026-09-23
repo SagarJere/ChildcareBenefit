@@ -39,6 +39,10 @@ class PayoutMonthlyLedger(Base):
     EntitlementAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))
     OpeningBalance: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))
     TotalAvailableAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))
+    # The child's first 13 months of life, auto-paid with no claim (user
+    # direction 2026-09-22) — mutually exclusive with ClaimAllocatedAmount
+    # for any given month; see app/services/payout_calculator.py.
+    FirstYearPayoutAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2), default=0)
     ClaimAllocatedAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))
     AdjustmentAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2), default=0)
     ClosingBalance: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))

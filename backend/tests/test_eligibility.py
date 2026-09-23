@@ -44,7 +44,10 @@ def test_eligibility_report_shows_utilized_in_progress_balance_and_last_modified
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=950003, employee_id="95000003", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Kid Two", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Report Kid Two", "2024-06-01")
 
     approved_claim = claimant.post(
         "/api/v1/claims",
@@ -93,7 +96,7 @@ def test_eligibility_report_shows_utilized_in_progress_balance_and_last_modified
     row = next(r for r in rows if r["financial_year"] == current_fy)
     assert row["child_id"] == child["child_id"]
     assert row["child_name"] == "Report Kid Two"
-    assert row["child_dob"] == "2026-03-01"
+    assert row["child_dob"] == "2024-06-01"
     assert float(row["utilized_amount"]) == 800.00
     assert float(row["in_progress_amount"]) == 500.00
     assert float(row["balance_amount"]) == float(row["allotted_amount"]) - 800.00

@@ -5,6 +5,7 @@ from app.services.eligibility_calculator import (
     child_month_number,
     claim_requires_documents,
     compute_financial_year,
+    is_first_year_payout_month,
     next_financial_year_needed,
     next_financial_year_window,
 )
@@ -194,3 +195,28 @@ class TestClaimRequiresDocuments:
         # Confirmed business decision: month is counted from DOB, not from
         # when the employee joined or eligibility began.
         assert claim_requires_documents(child_dob=date(2020, 1, 1), invoice_date=date(2026, 9, 1))
+
+
+class TestIsFirstYearPayoutMonth:
+    def test_months_one_through_thirteen_are_first_year(self) -> None:
+        # Boundary checks: the birth month and the last first-year month.
+        assert is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2023, 6, 1))
+        assert is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2024, 6, 1))
+
+    def test_month_fourteen_onward_is_not_first_year(self) -> None:
+        assert not is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2024, 7, 1))
+        assert not is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2026, 1, 1))
+
+    def test_month_is_counted_from_dob_not_eligibility_start(self) -> None:
+        # Mirrors TestClaimRequiresDocuments's late-enrollment case — a
+        # child already past month 13 by the time eligibility begins has
+        # no first-year-payout months at all, which is how the "employee
+        # joined late" scenario is handled without a special case.
+        assert not is_first_year_payout_month(child_dob=date(2020, 1, 1), month=date(2026, 9, 1))
+
+    def test_month_before_child_was_born_is_not_first_year(self) -> None:
+        # child_month_number is zero or negative for a month before the
+        # child's own birth month, which must not satisfy "<= 13" — there
+        # is no first-year payout before the child existed.
+        assert not is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2010, 1, 15))
+        assert not is_first_year_payout_month(child_dob=date(2023, 6, 1), month=date(2023, 5, 1))

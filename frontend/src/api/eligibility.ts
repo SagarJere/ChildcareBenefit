@@ -58,3 +58,16 @@ export async function getMyPayoutReport(financialYear?: string): Promise<PayoutR
   })
   return data
 }
+
+/** The employee's own equivalent of HR's first-year payout report — the
+ * child's first-13-months auto-paid amounts only, with no claim
+ * involved. Same shape/params as getMyPayoutReport. */
+export async function getMyFirstYearPayoutReport(
+  financialYear?: string,
+): Promise<PayoutReportResponse> {
+  const { data } = await apiClient.get<PayoutReportResponse>(
+    '/eligibility/payout-report/first-year',
+    { params: financialYear ? { financial_year: financialYear } : undefined },
+  )
+  return data
+}

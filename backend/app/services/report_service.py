@@ -243,12 +243,19 @@ def build_headcount(db: Session, *, as_of: date | None = None) -> HeadcountRespo
     )
 
 
+_LEDGER_FIELD_BY_SOURCE = {
+    "claim": "ClaimAllocatedAmount",
+    "first_year": "FirstYearPayoutAmount",
+}
+
+
 def build_payout_report(
     db: Session,
     *,
     financial_year: str | None,
     employee_id: str | None,
     child_id: str | None,
+    source: str = "claim",
 ) -> PayoutReportResponse:
     """The HR payout report (user direction 2026-09-20; see
     DECISIONS_LOG.md item 50): one row per Employee + Child + Financial
@@ -259,11 +266,19 @@ def build_payout_report(
     aggregate" pattern as the other HR reports — see item 48's reasoning
     for why a dedicated summary table was deferred).
 
-    Only (employee, child, financial year) combinations with at least one
-    approved claim ever have ledger rows at all — see
-    payout_repository.get_ledger_rows_for_report — so nothing-to-report
-    cases are naturally excluded rather than shown as all-zero rows.
+    `source` picks which of the ledger's two mutually-exclusive-per-month
+    amounts to report on: `"claim"` (the original report — approved-claim
+    payout, months 14+) or `"first_year"` (the child's first 13 months,
+    auto-paid with no claim — see DECISIONS_LOG.md's first-year-payout
+    Increment 4). A ledger row can exist from one source with nothing
+    from the other (e.g. a fresh child's first-year rows before any claim
+    is ever approved, or an older child's claim rows with no first-year
+    months in range at all — see Increment 2's `_has_first_year_payout`
+    guard) — groups with nothing to report for the requested `source` are
+    excluded, the same "nothing-to-report cases aren't shown as all-zero
+    rows" convention the report always had.
     """
+    ledger_field = _LEDGER_FIELD_BY_SOURCE[source]
     ledger_rows = payout_repository.get_ledger_rows_for_report(
         db, financial_year=financial_year, employee_id=employee_id, child_id=child_id
     )
@@ -284,11 +299,13 @@ def build_payout_report(
             key, {field: Decimal("0") for field in _MONTH_FIELD_BY_NUMBER.values()}
         )
         field = _MONTH_FIELD_BY_NUMBER[row.PayoutMonth.month]
-        month_totals[field] += row.CalculatedPayoutAmount
+        month_totals[field] += getattr(row, ledger_field)
 
     rows = []
     for (emp_id, row_child_id, fy), month_totals in sorted(grouped.items()):
         total_payout = sum(month_totals.values(), Decimal("0"))
+        if total_payout == 0:
+            continue
         # ChildID is a foreign key on Childcare_PayoutMonthlyLedger, so the
         # row is guaranteed to exist.
         child = children_by_id.get(row_child_id)

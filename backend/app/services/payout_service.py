@@ -25,6 +25,7 @@ def recalculate_payout(db: Session, eligibility_id: int) -> None:
     approved_claims = payout_repository.get_approved_claims_with_approval_time(db, eligibility_id)
 
     result = payout_calculator.calculate_payout_schedule(
+        child_dob=eligibility.ChildDOB,
         eligibility_start_date=eligibility.EligibilityStartDate,
         eligibility_end_date=eligibility.EligibilityEndDate,
         approved_claims=approved_claims,

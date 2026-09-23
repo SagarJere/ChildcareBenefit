@@ -701,3 +701,169 @@
     only supported status/employee_id/child_id. Also renamed its
     "Date" column to "Invoice Date" for consistency with the reports
     (item 59).
+63. First-year payout, Increment 1 — calculator + schema (user direction
+    2026-09-22/23): a child's first 13 months of life (month 1 = birth
+    month) are now paid automatically, with no claim, per new user
+    requirement; months 14-72 remain claim-driven as before. This
+    increment covers only the calculation/persistence layer — not yet
+    wired into add-child, claim creation, or reports (increments 2-5).
+
+    `eligibility_calculator.py` gained `FIRST_YEAR_PAYOUT_CHILD_MONTHS =
+    13` and `is_first_year_payout_month(child_dob, month)`, deliberately
+    a new function rather than repurposing the existing
+    `claim_requires_documents`/`DOCUMENT_FREE_CHILD_MONTHS = 12` (month
+    1-12 document-optional) flag — the semantics differ (that one is an
+    unenforced "recommended" flag per item 38; this one will gate a hard
+    block in Increment 3) and the boundary differs by one month.
+
+    `payout_calculator.calculate_payout_schedule` now takes `child_dob`
+    and partitions each eligibility window's months into "first-year"
+    (auto-paid in full, zero carry-forward interaction) and "claimable"
+    (the existing claim-driven pointer/carry-forward mechanics,
+    unchanged, just scoped to this sub-list). Because child age only
+    increases with calendar time, first-year months are always a prefix
+    of the window — never interleaved with claimable ones — so the
+    claimable months always start fresh at opening balance 0 regardless
+    of how many first-year months preceded them. The late-join/late-
+    enrollment case (employee joins after the child is already past
+    month 13) falls out for free: the intersection of "child age 1-13"
+    with "the eligibility window" (which already accounts for join date)
+    is simply empty, no special case needed.
+
+    Schema: `Childcare_PayoutMonthlyLedger` gained `FirstYearPayoutAmount`
+    (NOT NULL, default 0) — mutually exclusive per month with the
+    existing `ClaimAllocatedAmount`. `CalculatedPayoutAmount` is now
+    their sum (previously just `ClaimAllocatedAmount`).
+    `Childcare_PayoutAllocation` (the per-claim table) is untouched —
+    there's no claim behind a first-year month to allocate.
+
+    Many existing integration tests use a child DOB of "2026-03-01" —
+    recent enough to fall inside the new first-year window as of
+    2026-09-23 — so approving a claim for them now correctly finds zero
+    claimable months and raises `PayoutCapacityExceededError` (expected:
+    claim-blocking for that period is Increment 3, not yet built). Fixed
+    by aging up the affected tests' child DOBs to 2024-06-01 (past month
+    13, still well within the 6-year cutoff) wherever the test's point is
+    claim/payout mechanics unrelated to this feature. One test
+    (`test_full_worked_example_persists_correctly_across_multiple_
+    approvals`) specifically needed eligibility to *start* in September
+    to match PAYOUT_REQUIREMENTS.md §18's worked example — re-anchored
+    that via the employee's join date instead of the child's DOB, keeping
+    the child itself old.
+64. First-year payout, Increment 2 — add-child integration (user
+    direction 2026-09-22/23): `child_service.add_child` now populates the
+    payout ledger immediately via the same `payout_service.
+    recalculate_payout` from Increment 1 — with zero claims at add time,
+    it naturally comes out as first-year-only rows. Discovered that
+    item 43's existing "always create next financial year's eligibility
+    too, capped at the six-year cutoff" default already covers every
+    case where the first-13-months window spans two FYs (that window is
+    always shorter than the six-year one it's nested inside), so no new
+    "eager next-FY creation" logic was needed — just calling the same
+    ledger-population step for both eligibility records when both exist.
+
+    Found and fixed a real problem while wiring this in: calling
+    `recalculate_payout` unconditionally, even for a child with nothing
+    to auto-pay (e.g. already past month 13) and no claims yet, created
+    ledger rows where every amount is zero — breaking the Payout Report's
+    existing assumption (its own code comment) that a child only has
+    ledger rows once there's something to report. Fixed with
+    `child_service._has_first_year_payout`: since first-year months are
+    always a *prefix* of an eligibility window (age only increases with
+    calendar time — see Increment 1), checking just the window's first
+    month is enough to know whether the whole window has anything to
+    auto-pay; `recalculate_payout` is now only called when it does.
+    Several existing tests that build a fresh child and immediately check
+    the ledger/report is empty needed the same "age the child up"
+    treatment as Increment 1's fixes, for the same reason.
+
+    New `tests/test_first_year_payout.py` covers this increment
+    end-to-end: a fresh child gets first-year ledger rows immediately; a
+    child whose window spans two FYs gets the split correctly on both
+    eligibility records; a child with nothing to auto-pay gets no ledger
+    rows at all; and the late-join override (employee joins after the
+    child is already past month 13, even though the child is still young
+    enough by age) correctly results in no first-year payout.
+65. First-year payout, Increment 3 — claim blocking (user direction
+    2026-09-22/23): `claim_service._resolve_eligibility_for_invoice`
+    (shared by both `create_claim` and `update_claim`) now rejects an
+    invoice date falling within the child's first 13 months with a new
+    `FirstYearPayoutPeriodError` (400) — that period has no claim to
+    raise, it's paid automatically. Same late-join override as
+    Increments 1-2 applies here too, for the same reason (the eligibility
+    window itself never reaches those months).
+
+    Found and fixed a real bug in `is_first_year_payout_month` while
+    investigating an unrelated test failure: `child_month_number` returns
+    zero or negative for a date *before* the child's own birth month,
+    which satisfied "<= 13" and so incorrectly counted as first-year —
+    meaning a claim dated before a child was even born was being blocked
+    with the wrong error (and, more importantly, would have been
+    incorrectly blocked in production for any legacy/backdated invoice
+    predating a child's DOB). Fixed by also requiring the month number be
+    >= 1. Added a regression test.
+
+    This increment had by far the widest test-suite blast radius of the
+    three so far: dozens of existing tests across test_claims.py,
+    test_hr.py, test_eligibility_balance.py, test_reports.py, and
+    test_security_hardening.py used a shared "young child" DOB fixture
+    (2026-03-01) purely for convenience, with no relation to age — now
+    that raising a claim for a young child is a real business rule, not
+    just an incidental test detail, all of them needed aging up to a DOB
+    safely past month 13 (2024-06-01, consistently). One test's entire
+    premise (`test_submit_claim_succeeds_without_documents_in_first_
+    twelve_months`) became impossible to construct at all — a claim
+    genuinely cannot exist for that period anymore — and was removed
+    outright; its coverage of "submission doesn't require documents" is
+    already provided by the sibling month-13+ test, since that's the only
+    period a claim can exist in now. One test
+    (`test_headcount_report_counts_children_correctly`) deliberately
+    needed a young child for its "0-1" age-bracket assertion and was left
+    untouched, since it never raises a claim.
+
+    New tests in `tests/test_first_year_payout.py` cover the blocking
+    behavior directly: create blocked at month 13, allowed at month 14,
+    update blocked when moved into the first-year period, and the
+    late-join override still permitting claims despite a young child.
+66. First-year payout, Increment 4 — reports split (user direction
+    2026-09-22/23): `report_service.build_payout_report` gained a
+    `source` parameter (`"claim"` or `"first_year"`) — same grouping/
+    pivot logic as before, just summing `ClaimAllocatedAmount` or
+    `FirstYearPayoutAmount` instead of the combined
+    `CalculatedPayoutAmount`, with (employee, child, FY) groups that have
+    nothing to report for the requested source excluded (same
+    "nothing-to-report isn't shown as an all-zero row" convention the
+    report always had — necessary now since a ledger row can exist from
+    one source with genuinely nothing from the other, e.g. a fresh
+    child's first-year rows before any claim is ever approved).
+
+    New endpoints `GET /hr/reports/payout/first-year` and `GET
+    /eligibility/payout-report/first-year` (employee's own), siblings of
+    the existing (now explicitly claim-only) `/hr/reports/payout` and
+    `/eligibility/payout-report`. Frontend: HR → Reports gets a new
+    "First Year Payout" tab (the `PayoutReport` component took a
+    `source` prop rather than being duplicated); "My Payout" shows both
+    as two labeled sections on one page (not tabs) per the earlier-agreed
+    default, each with its own total/table/CSV export.
+
+    Also fixed a real consistency gap found while wiring this in: the
+    Home page's "Total Payout" stat card and "Monthly Payout" chart only
+    ever queried claim payout — a family still in their first-13-months
+    period would have seen ₹0 there despite real automatic payout. Both
+    now combine both sources; HR's "Total Approved Payout" stat card was
+    already correctly scoped by its own label and was left unchanged.
+67. First-year payout, Increment 5 — production data wipe (user
+    direction 2026-09-22/23, executed 2026-09-24 with explicit
+    confirmation of scope): since the app is still in testing and none of
+    the existing production data was created under the new first-year
+    rule, all child/eligibility/claim/payout data on the SmarterASP
+    database was deleted — `Childcare_ChildMaster`,
+    `Childcare_EligibilityMaster`, `Childcare_ClaimMaster`,
+    `Childcare_ClaimAttachments`, `Childcare_ClaimApprovalHistory`,
+    `Childcare_PayoutMonthlyLedger`, `Childcare_PayoutAllocation` — in
+    FK-safe order as one transaction, plus both objects in the Cloudflare
+    R2 document bucket. `Master_Emp_BasicInfo`, `Childcare_HRApprovers`,
+    and `Childcare_FinancialYearMaster` were left untouched, the same
+    scope as the earlier local-dev wipe (item — see the full data wipe
+    entry earlier in this log). This closes out the first-year-payout
+    feature (items 63-67).

@@ -51,7 +51,10 @@ def test_claims_summary_reflects_filters_and_totals(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=940002, employee_id="94000002", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Kid One", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Report Kid One", "2024-06-01")
 
     claim_a = claimant.post(
         "/api/v1/claims",
@@ -117,7 +120,9 @@ def test_claims_summary_reflects_filters_and_totals(
 
 def test_claims_summary_csv_format(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=940004, employee_id="94000004", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Kid Two", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), since claims can't be raised within it.
+    child = _add_child(claimant, "Report Kid Two", "2024-06-01")
     claim = claimant.post(
         "/api/v1/claims",
         json={
@@ -147,7 +152,10 @@ def test_eligibility_utilization_computes_live_totals(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=940006, employee_id="94000006", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Kid Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Report Kid Three", "2024-06-01")
 
     approved_claim = claimant.post(
         "/api/v1/claims",

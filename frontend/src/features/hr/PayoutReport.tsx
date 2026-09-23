@@ -2,25 +2,57 @@ import { useQuery } from '@tanstack/react-query'
 import { Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
-import { downloadReportCsv, getPayoutReport, type PayoutReportFilters } from '../../api/reports'
+import {
+  downloadReportCsv,
+  getFirstYearPayoutReport,
+  getPayoutReport,
+  type PayoutReportFilters,
+} from '../../api/reports'
 import { EmployeeAutocomplete } from '../../components/EmployeeAutocomplete'
 import { FinancialYearSelect } from '../../components/FinancialYearSelect'
 import { PayoutReportTable } from '../../components/PayoutReportTable'
 import { formatCurrency } from '../../lib/format'
 
-export function PayoutReport() {
+interface PayoutReportProps {
+  /** "claim" (default): the original report, driven by approved claims
+   * (months 14+). "first_year": the child's first-13-months auto-paid
+   * amounts, with no claim involved. */
+  source?: 'claim' | 'first_year'
+}
+
+const SOURCE_CONFIG = {
+  claim: {
+    queryKey: 'report-payout',
+    fetch: getPayoutReport,
+    path: '/hr/reports/payout',
+    filename: 'payout-report.csv',
+    idPrefix: 'payout',
+    totalLabel: 'Total payout',
+  },
+  first_year: {
+    queryKey: 'report-payout-first-year',
+    fetch: getFirstYearPayoutReport,
+    path: '/hr/reports/payout/first-year',
+    filename: 'first-year-payout-report.csv',
+    idPrefix: 'firstYearPayout',
+    totalLabel: 'Total first year payout',
+  },
+} as const
+
+export function PayoutReport({ source = 'claim' }: PayoutReportProps) {
   const [filters, setFilters] = useState<PayoutReportFilters>({})
+  const config = SOURCE_CONFIG[source]
 
   const { data, isPending, isError } = useQuery({
-    queryKey: ['report-payout', filters],
-    queryFn: () => getPayoutReport(filters),
+    queryKey: [config.queryKey, filters],
+    queryFn: () => config.fetch(filters),
   })
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
         <FinancialYearSelect
-          id="payoutFyFilter"
+          id={`${config.idPrefix}FyFilter`}
           label="Financial year"
           value={filters.financial_year ?? ''}
           onChange={(financial_year) =>
@@ -28,7 +60,7 @@ export function PayoutReport() {
           }
         />
         <EmployeeAutocomplete
-          id="payoutEmployeeFilter"
+          id={`${config.idPrefix}EmployeeFilter`}
           label="Employee"
           value={filters.employee_id ?? ''}
           onChange={(employee_id) =>
@@ -36,11 +68,14 @@ export function PayoutReport() {
           }
         />
         <div>
-          <label htmlFor="payoutChildFilter" className="block text-xs font-medium text-slate-500">
+          <label
+            htmlFor={`${config.idPrefix}ChildFilter`}
+            className="block text-xs font-medium text-slate-500"
+          >
             Child ID
           </label>
           <input
-            id="payoutChildFilter"
+            id={`${config.idPrefix}ChildFilter`}
             type="text"
             value={filters.child_id ?? ''}
             onChange={(e) => setFilters((f) => ({ ...f, child_id: e.target.value || undefined }))}
@@ -51,9 +86,9 @@ export function PayoutReport() {
           type="button"
           onClick={() =>
             downloadReportCsv(
-              '/hr/reports/payout',
+              config.path,
               filters as Record<string, string | undefined>,
-              'payout-report.csv',
+              config.filename,
             )
           }
           className="ml-auto flex items-center gap-1.5 rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200"
@@ -74,7 +109,7 @@ export function PayoutReport() {
       {data && (
         <>
           <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm">
-            <div className="text-slate-500">Total payout</div>
+            <div className="text-slate-500">{config.totalLabel}</div>
             <div className="font-semibold text-slate-900">
               {formatCurrency(data.totals.total_payout)}
             </div>

@@ -66,7 +66,10 @@ def test_approving_a_single_claim_persists_ledger_and_allocation(
     login_as, make_hr_approver, make_employee, db_session: Session
 ) -> None:
     claimant = login_as(memp_id=970001, employee_id="97000001", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Payout Kid One", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Payout Kid One", "2024-06-01")
     eligibility_id = child["eligibility"]["eligibility_id"]
     claim = _create_and_submit_claim(
         claimant,
@@ -113,12 +116,16 @@ def test_full_worked_example_persists_correctly_across_multiple_approvals(
     Approval timestamps are backdated to Sep/Nov/Jan (see module
     docstring) so the ledger/allocation can be checked against the exact
     figures in the spec's own worked example, deterministically."""
-    claimant = login_as(memp_id=970003, employee_id="97000003", Joindate=datetime(2018, 1, 1))
-    # Born in September so eligibility *starts* in September, matching
+    # Joined in September so eligibility *starts* in September, matching
     # PAYOUT_REQUIREMENTS.md §18's "eligibility begins in September" —
     # not just "the first claim happens to be approved in September" with
-    # months of pre-accumulated carry-forward already sitting there.
-    child = _add_child(claimant, "Payout Kid Two", "2026-09-01")
+    # months of pre-accumulated carry-forward already sitting there. Driven
+    # by the employee's join date rather than the child's DOB, and the
+    # child is old enough to be well past the first-13-months
+    # first-year-payout window (2026-09-23) — this test is specifically
+    # about claim-driven payout, unrelated to that feature.
+    claimant = login_as(memp_id=970003, employee_id="97000003", Joindate=datetime(2026, 9, 1))
+    child = _add_child(claimant, "Payout Kid Two", "2024-09-01")
     eligibility_id = child["eligibility"]["eligibility_id"]
 
     claim_a = _create_and_submit_claim(
@@ -221,7 +228,10 @@ def test_employee_and_hr_claim_views_show_the_payout_schedule(
     """PAYOUT_REQUIREMENTS.md §16: the employee (and HR) should be able
     to see, on the claim itself, when an approved claim will be paid."""
     claimant = login_as(memp_id=970007, employee_id="97000007", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Payout Kid Four", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Payout Kid Four", "2024-06-01")
     claim = _create_and_submit_claim(
         claimant,
         child["child_id"],
@@ -259,7 +269,12 @@ def test_rejecting_a_claim_creates_no_payout_rows(
     login_as, make_hr_approver, make_employee, db_session: Session
 ) -> None:
     claimant = login_as(memp_id=970005, employee_id="97000005", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Payout Kid Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23) — otherwise add_child itself would already
+    # populate first-year-payout ledger rows, which this test's "no
+    # payout rows at all" assertion isn't about (it's specifically about
+    # reject not triggering claim-driven payout persistence).
+    child = _add_child(claimant, "Payout Kid Three", "2024-06-01")
     eligibility_id = child["eligibility"]["eligibility_id"]
     claim = _create_and_submit_claim(
         claimant,

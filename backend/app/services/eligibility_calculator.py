@@ -14,6 +14,7 @@ from decimal import Decimal
 MONTHLY_BENEFIT_AMOUNT = Decimal("14000")
 SIX_YEAR_LIMIT_YEARS = 6
 DOCUMENT_FREE_CHILD_MONTHS = 12
+FIRST_YEAR_PAYOUT_CHILD_MONTHS = 13
 
 
 @dataclass(frozen=True)
@@ -147,3 +148,18 @@ def claim_requires_documents(*, child_dob: date, invoice_date: date) -> bool:
     return child_month_number(child_dob=child_dob, invoice_date=invoice_date) > (
         DOCUMENT_FREE_CHILD_MONTHS
     )
+
+
+def is_first_year_payout_month(*, child_dob: date, month: date) -> bool:
+    """True for the child's first 13 months of life (month 1 = birth
+    month) — the period that is paid automatically, with no employee
+    claim, per the first-year-payout rule (user direction 2026-09-22).
+    From month 14 onward, payout is driven by approved claims as before.
+
+    A `month` before the child's own birth month is explicitly excluded
+    (`child_month_number` would otherwise return zero or negative, which
+    satisfies "<= 13" too) — there is no such thing as a first-year
+    payout month before the child existed.
+    """
+    number = child_month_number(child_dob=child_dob, invoice_date=month)
+    return 1 <= number <= FIRST_YEAR_PAYOUT_CHILD_MONTHS

@@ -40,7 +40,7 @@ class TestPathTraversalInUploadedFilenames:
         self, login_as, db_session: Session
     ) -> None:
         client = login_as(memp_id=950001, employee_id="95000001", Joindate=datetime(2018, 1, 1))
-        child = _add_child(client, "Sec Kid One", "2026-03-01")
+        child = _add_child(client, "Sec Kid One", "2024-06-01")
         claim = client.post(
             "/api/v1/claims",
             json={
@@ -133,7 +133,7 @@ class TestCrossEmployeeOwnershipIsEnforced:
         self, login_as, make_employee, db_session: Session
     ) -> None:
         owner = login_as(memp_id=950003, employee_id="95000003", Joindate=datetime(2018, 1, 1))
-        child = _add_child(owner, "Sec Kid Two", "2026-03-01")
+        child = _add_child(owner, "Sec Kid Two", "2024-06-01")
         claim = owner.post(
             "/api/v1/claims",
             json={
@@ -219,7 +219,7 @@ class TestNPlusOneQueryRegression:
         claimant = login_as(
             memp_id=950006, employee_id="95000006", Joindate=datetime(2018, 1, 1)
         )
-        child = _add_child(claimant, "Sec Kid Three", "2026-03-01")
+        child = _add_child(claimant, "Sec Kid Three", "2024-06-01")
         for i in range(5):
             created = claimant.post(
                 "/api/v1/claims",

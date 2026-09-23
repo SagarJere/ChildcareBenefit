@@ -36,6 +36,12 @@ class NoEligibilityForPeriodError(Exception):
     the claim's invoice date falls in."""
 
 
+class FirstYearPayoutPeriodError(Exception):
+    """The invoice date falls within the child's first 13 months of life,
+    which is paid automatically — no claim is needed, or allowed, for
+    that period (user direction 2026-09-22/23)."""
+
+
 class ClaimNotEditableError(Exception):
     """The claim is not in Draft or SentBack status, so it cannot be
     edited, have attachments added, or be (re-)submitted."""

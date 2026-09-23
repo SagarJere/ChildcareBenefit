@@ -38,6 +38,7 @@ from app.core.errors import (
     ClaimNotFoundError,
     DuplicateInvoiceError,
     FileTooLargeError,
+    FirstYearPayoutPeriodError,
     InvalidUploadError,
     NoEligibilityForPeriodError,
 )
@@ -79,6 +80,14 @@ def _resolve_eligibility_for_invoice(
     child = child_repository.get_child_for_employee(db, employee.memp_id, child_id)
     if child is None:
         raise ChildNotFoundError(f"No child {child_id} found for this employee.")
+
+    if eligibility_calculator.is_first_year_payout_month(
+        child_dob=child.ChildDOB, month=invoice_date
+    ):
+        raise FirstYearPayoutPeriodError(
+            "No claim is needed for this period — the child's first 13 months are paid "
+            "automatically."
+        )
 
     fy = eligibility_calculator.compute_financial_year(invoice_date)
     rows = eligibility_repository.get_for_child(db, employee.memp_id, child_id, fy.label)

@@ -78,10 +78,11 @@ def replace_ledger_and_allocations(
             EntitlementAmount=entry.entitlement_amount,
             OpeningBalance=entry.opening_balance,
             TotalAvailableAmount=entry.total_available_amount,
+            FirstYearPayoutAmount=entry.first_year_payout_amount,
             ClaimAllocatedAmount=entry.claim_allocated_amount,
             AdjustmentAmount=0,
             ClosingBalance=entry.carry_forward_amount,
-            CalculatedPayoutAmount=entry.claim_allocated_amount,
+            CalculatedPayoutAmount=entry.first_year_payout_amount + entry.claim_allocated_amount,
         )
         db.add(ledger_row)
         db.flush()

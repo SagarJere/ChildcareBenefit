@@ -32,7 +32,12 @@ def test_payout_report_is_empty_with_no_approved_claims(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=990002, employee_id="99000002", Joindate=datetime(2018, 1, 1))
-    _add_child(claimant, "Report Payout Kid Zero", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23) — otherwise add_child itself would already
+    # populate first-year-payout ledger rows, and this report (until
+    # Increment 4 splits it) shows all payout regardless of source, so
+    # "empty with no claims" would no longer hold.
+    _add_child(claimant, "Report Payout Kid Zero", "2024-06-01")
 
     make_employee(memp_id=990003, employee_id="99000003", Joindate=datetime(2018, 1, 1))
     make_hr_approver("99000003")
@@ -51,7 +56,7 @@ def test_payout_report_shows_apr_to_mar_breakdown_and_supports_filters(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=990004, employee_id="99000004", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Payout Kid One", "2026-03-01")
+    child = _add_child(claimant, "Report Payout Kid One", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
 
     claim = claimant.post(
@@ -86,7 +91,7 @@ def test_payout_report_shows_apr_to_mar_breakdown_and_supports_filters(
     assert row["employee_id"] == "99000004"
     assert row["child_id"] == child["child_id"]
     assert row["child_name"] == "Report Payout Kid One"
-    assert row["child_dob"] == "2026-03-01"
+    assert row["child_dob"] == "2024-06-01"
     assert row["financial_year"] == fy
     months = ("apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec", "jan", "feb", "mar")
     month_total = sum(float(row[m]) for m in months)
@@ -109,7 +114,7 @@ def test_payout_report_shows_apr_to_mar_breakdown_and_supports_filters(
 
 def test_payout_report_csv_format(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=990006, employee_id="99000006", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Payout Kid Two", "2026-03-01")
+    child = _add_child(claimant, "Report Payout Kid Two", "2024-06-01")
     claim = claimant.post(
         "/api/v1/claims",
         json={
@@ -148,7 +153,7 @@ def test_employee_payout_report_is_scoped_to_own_children(
     service as HR's report but must never expose another employee's
     data, and must not require (or accept) an employee filter."""
     claimant = login_as(memp_id=990008, employee_id="99000008", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Payout Kid Three", "2026-03-01")
+    child = _add_child(claimant, "Report Payout Kid Three", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
     claim = claimant.post(
         "/api/v1/claims",
@@ -184,13 +189,13 @@ def test_employee_payout_report_is_scoped_to_own_children(
     assert len(rows) == 1
     assert rows[0]["employee_id"] == "99000008"
     assert rows[0]["child_id"] == child["child_id"]
-    assert rows[0]["child_dob"] == "2026-03-01"
+    assert rows[0]["child_dob"] == "2024-06-01"
     assert float(rows[0]["total_payout"]) == 7000.00
 
 
 def test_employee_payout_report_csv_format(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=990011, employee_id="99000011", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Report Payout Kid Four", "2026-03-01")
+    child = _add_child(claimant, "Report Payout Kid Four", "2024-06-01")
     claim = claimant.post(
         "/api/v1/claims",
         json={

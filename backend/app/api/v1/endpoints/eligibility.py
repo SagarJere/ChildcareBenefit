@@ -48,8 +48,9 @@ def get_employee_payout_report(
     db: Session = Depends(get_db),
 ) -> PayoutReportResponse | PlainTextResponse:
     """The employee-facing equivalent of HR's payout report (`GET
-    /hr/reports/payout`) — the same Employee + Child + Financial Year,
-    April-through-March pivoted view, reusing the exact same
+    /hr/reports/payout`) — claim-driven payout only (months 14+); see the
+    sibling `/eligibility/payout-report/first-year` for the child's
+    first-13-months auto-paid amounts. Reuses the exact same
     `report_service.build_payout_report`, just always scoped to the
     caller's own EmployeeID rather than exposing an employee filter. Must
     be declared before `/eligibility/{child_id}` so "payout-report" isn't
@@ -59,12 +60,41 @@ def get_employee_payout_report(
         financial_year=financial_year,
         employee_id=current_employee.employee_id,
         child_id=child_id,
+        source="claim",
     )
     if format == "csv":
         return csv_response(
             [row.model_dump(mode="json") for row in report.rows],
             list(report.rows[0].model_dump().keys()) if report.rows else [],
             "my-payout.csv",
+        )
+    return report
+
+
+@router.get("/eligibility/payout-report/first-year", response_model=None)
+def get_employee_first_year_payout_report(
+    financial_year: str | None = None,
+    child_id: str | None = None,
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    current_employee: EmployeeProfile = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> PayoutReportResponse | PlainTextResponse:
+    """The employee-facing equivalent of HR's first-year payout report —
+    the child's first-13-months auto-paid amounts only, with no claim
+    involved. Must be declared before `/eligibility/{child_id}` for the
+    same reason as the sibling route above."""
+    report = report_service.build_payout_report(
+        db,
+        financial_year=financial_year,
+        employee_id=current_employee.employee_id,
+        child_id=child_id,
+        source="first_year",
+    )
+    if format == "csv":
+        return csv_response(
+            [row.model_dump(mode="json") for row in report.rows],
+            list(report.rows[0].model_dump().keys()) if report.rows else [],
+            "my-first-year-payout.csv",
         )
     return report
 

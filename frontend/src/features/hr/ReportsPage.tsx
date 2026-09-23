@@ -9,6 +9,7 @@ const TABS = [
   { key: 'claims', label: 'Claims Summary' },
   { key: 'eligibility', label: 'Eligibility Utilization' },
   { key: 'payout', label: 'Payout' },
+  { key: 'firstYearPayout', label: 'First Year Payout' },
   { key: 'headcount', label: 'Headcount' },
 ] as const
 
@@ -22,7 +23,7 @@ export function ReportsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Reports</h1>
         <p className="mt-1 text-slate-600">
-          Claims, eligibility utilization, payout, and headcount.
+          Claims, eligibility utilization, payout, first year payout, and headcount.
         </p>
       </div>
 
@@ -45,7 +46,8 @@ export function ReportsPage() {
 
       {tab === 'claims' && <ClaimsSummaryReport />}
       {tab === 'eligibility' && <EligibilityUtilizationReport />}
-      {tab === 'payout' && <PayoutReport />}
+      {tab === 'payout' && <PayoutReport source="claim" />}
+      {tab === 'firstYearPayout' && <PayoutReport source="first_year" />}
       {tab === 'headcount' && <HeadcountReport />}
     </div>
   )

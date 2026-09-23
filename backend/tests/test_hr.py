@@ -75,7 +75,7 @@ def test_hr_can_list_and_view_submitted_claim(
         FullName="Claimant Three",
         Joindate=datetime(2018, 1, 1),
     )
-    child = _add_child(claimant, "Kid HR One", "2026-03-01")
+    child = _add_child(claimant, "Kid HR One", "2024-06-01")
     submitted_claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930004, employee_id="93000004", Joindate=datetime(2018, 1, 1))
@@ -101,8 +101,8 @@ def test_hr_can_list_and_view_submitted_claim(
 
 def test_hr_list_filters_by_invoice_date_range(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=930020, employee_id="93000020", Joindate=datetime(2018, 1, 1))
-    child_a = _add_child(claimant, "Kid HR Date A", "2026-03-01")
-    child_b = _add_child(claimant, "Kid HR Date B", "2026-04-01")
+    child_a = _add_child(claimant, "Kid HR Date A", "2024-06-01")
+    child_b = _add_child(claimant, "Kid HR Date B", "2024-07-01")
     early_claim = _create_and_submit_claim(claimant, child_a["child_id"], invoice_date="2026-06-01")
     late_claim = _create_and_submit_claim(claimant, child_b["child_id"], invoice_date="2026-09-01")
 
@@ -122,7 +122,7 @@ def test_hr_list_filters_by_invoice_date_range(login_as, make_hr_approver, make_
 
 def test_hr_list_filters_by_status(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=930005, employee_id="93000005", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Two", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Two", "2024-06-01")
     submitted_claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930006, employee_id="93000006", Joindate=datetime(2018, 1, 1))
@@ -154,8 +154,8 @@ def test_hr_list_filters_by_employee_and_child_for_claim_history(
     for this exact employee+child, without mixing in the employee's other
     children's claims."""
     claimant = login_as(memp_id=930018, employee_id="93000018", Joindate=datetime(2018, 1, 1))
-    child_a = _add_child(claimant, "Kid HR History A", "2026-03-01")
-    child_b = _add_child(claimant, "Kid HR History B", "2026-04-01")
+    child_a = _add_child(claimant, "Kid HR History A", "2024-06-01")
+    child_b = _add_child(claimant, "Kid HR History B", "2024-07-01")
     claim_a1 = _create_and_submit_claim(claimant, child_a["child_id"], invoice_date="2026-08-01")
     claimant.post(
         "/api/v1/claims",
@@ -189,7 +189,10 @@ def test_hr_approve_claim_updates_status_and_history(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=930007, employee_id="93000007", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature.
+    child = _add_child(claimant, "Kid HR Three", "2024-06-01")
     claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930008, employee_id="93000008", Joindate=datetime(2018, 1, 1))
@@ -220,7 +223,7 @@ def test_hr_approve_rejects_amount_exceeding_invoice(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=930009, employee_id="93000009", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Four", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Four", "2024-06-01")
     claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930010, employee_id="93000010", Joindate=datetime(2018, 1, 1))
@@ -239,7 +242,7 @@ def test_hr_approve_rejects_amount_exceeding_invoice(
 
 def test_hr_reject_requires_remarks(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=930011, employee_id="93000011", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Five", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Five", "2024-06-01")
     claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930012, employee_id="93000012", Joindate=datetime(2018, 1, 1))
@@ -256,7 +259,7 @@ def test_hr_reject_claim_updates_status_and_history(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=930013, employee_id="93000013", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Six", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Six", "2024-06-01")
     claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930014, employee_id="93000014", Joindate=datetime(2018, 1, 1))
@@ -278,7 +281,7 @@ def test_hr_reject_claim_updates_status_and_history(
 
 def test_hr_cannot_act_on_non_submitted_claim(login_as, make_hr_approver, make_employee) -> None:
     claimant = login_as(memp_id=930015, employee_id="93000015", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Seven", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Seven", "2024-06-01")
     # Draft claim — never submitted.
     draft = claimant.post(
         "/api/v1/claims",
@@ -306,7 +309,7 @@ def test_send_back_then_employee_can_resubmit(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=930017, employee_id="93000017", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Kid HR Eight", "2026-03-01")
+    child = _add_child(claimant, "Kid HR Eight", "2024-06-01")
     claim = _create_and_submit_claim(claimant, child["child_id"])
 
     make_employee(memp_id=930018, employee_id="93000018", Joindate=datetime(2018, 1, 1))

@@ -13,7 +13,7 @@ import { Link } from 'react-router-dom'
 
 import { listClaims } from '../api/claims'
 import { listChildren } from '../api/children'
-import { getEligibilityReport, getMyPayoutReport } from '../api/eligibility'
+import { getEligibilityReport, getMyFirstYearPayoutReport, getMyPayoutReport } from '../api/eligibility'
 import { listHRClaims } from '../api/hr'
 import { getClaimsSummary, getHeadcount, getPayoutReport } from '../api/reports'
 import { BarChart, type BarChartDatum } from '../components/BarChart'
@@ -43,9 +43,17 @@ export function HomePage() {
     queryKey: ['my-payout-report'],
     queryFn: () => getMyPayoutReport(),
   })
+  const myFirstYearPayoutQuery = useQuery({
+    queryKey: ['my-first-year-payout-report'],
+    queryFn: () => getMyFirstYearPayoutReport(),
+  })
   const myPayoutCurrentFYQuery = useQuery({
     queryKey: ['my-payout-report', currentFY],
     queryFn: () => getMyPayoutReport(currentFY),
+  })
+  const myFirstYearPayoutCurrentFYQuery = useQuery({
+    queryKey: ['my-first-year-payout-report', currentFY],
+    queryFn: () => getMyFirstYearPayoutReport(currentFY),
   })
   const eligibilityReportQuery = useQuery({
     queryKey: ['eligibility-report'],
@@ -87,12 +95,17 @@ export function HomePage() {
   ).sort(([a], [b]) => a.localeCompare(b))
   const recentClaims = (claimsQuery.data ?? []).slice(0, 5)
 
+  // Combines both payout sources (first-year auto-pay + approved claims)
+  // into one total-payout view — the detailed per-source breakdown lives
+  // on the dedicated My Payout page.
   const monthlyPayoutData: BarChartDatum[] = MONTH_KEYS.map((key, i) => ({
     label: MONTH_LABELS[i],
-    value: (myPayoutCurrentFYQuery.data?.rows ?? []).reduce(
-      (sum, row) => sum + Number(row[key]),
-      0,
-    ),
+    value:
+      (myPayoutCurrentFYQuery.data?.rows ?? []).reduce((sum, row) => sum + Number(row[key]), 0) +
+      (myFirstYearPayoutCurrentFYQuery.data?.rows ?? []).reduce(
+        (sum, row) => sum + Number(row[key]),
+        0,
+      ),
   }))
 
   const claimsByStatusData: BarChartDatum[] = STATUS_DISPLAY_ORDER.filter(
@@ -171,7 +184,12 @@ export function HomePage() {
           icon={Wallet}
           label="Total Payout"
           value={
-            myPayoutQuery.data ? formatCurrency(myPayoutQuery.data.totals.total_payout) : '—'
+            myPayoutQuery.data && myFirstYearPayoutQuery.data
+              ? formatCurrency(
+                  Number(myPayoutQuery.data.totals.total_payout) +
+                    Number(myFirstYearPayoutQuery.data.totals.total_payout),
+                )
+              : '—'
           }
           to="/payout"
           accent="emerald"
@@ -254,21 +272,27 @@ export function HomePage() {
           <h2 className="mb-3 font-medium text-slate-900">
             Monthly Payout <span className="font-normal text-slate-400">— FY {currentFY}</span>
           </h2>
-          {myPayoutCurrentFYQuery.isPending && (
+          {(myPayoutCurrentFYQuery.isPending || myFirstYearPayoutCurrentFYQuery.isPending) && (
             <div className="flex items-center gap-2 text-slate-600">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               Loading…
             </div>
           )}
-          {myPayoutCurrentFYQuery.data && myPayoutCurrentFYQuery.data.rows.length === 0 && (
-            <p className="text-sm text-slate-500">
-              No payouts yet for FY {currentFY} — nothing here until HR approves one of your
-              claims.
-            </p>
-          )}
-          {myPayoutCurrentFYQuery.data && myPayoutCurrentFYQuery.data.rows.length > 0 && (
-            <BarChart data={monthlyPayoutData} formatValue={formatCurrency} />
-          )}
+          {myPayoutCurrentFYQuery.data &&
+            myFirstYearPayoutCurrentFYQuery.data &&
+            myPayoutCurrentFYQuery.data.rows.length === 0 &&
+            myFirstYearPayoutCurrentFYQuery.data.rows.length === 0 && (
+              <p className="text-sm text-slate-500">
+                No payouts yet for FY {currentFY} — nothing here until a claim is approved, or a
+                child's first-13-months auto-pay applies.
+              </p>
+            )}
+          {myPayoutCurrentFYQuery.data &&
+            myFirstYearPayoutCurrentFYQuery.data &&
+            (myPayoutCurrentFYQuery.data.rows.length > 0 ||
+              myFirstYearPayoutCurrentFYQuery.data.rows.length > 0) && (
+              <BarChart data={monthlyPayoutData} formatValue={formatCurrency} />
+            )}
         </div>
       </div>
 

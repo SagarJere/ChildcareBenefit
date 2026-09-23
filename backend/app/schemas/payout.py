@@ -30,6 +30,7 @@ class MonthlyLedgerEntryResponse(BaseModel):
     entitlement_amount: Decimal
     opening_balance: Decimal
     total_available_amount: Decimal
+    first_year_payout_amount: Decimal
     claim_allocated_amount: Decimal
     adjustment_amount: Decimal
     closing_balance: Decimal
@@ -42,6 +43,7 @@ class MonthlyLedgerEntryResponse(BaseModel):
             entitlement_amount=ledger.EntitlementAmount,
             opening_balance=ledger.OpeningBalance,
             total_available_amount=ledger.TotalAvailableAmount,
+            first_year_payout_amount=ledger.FirstYearPayoutAmount,
             claim_allocated_amount=ledger.ClaimAllocatedAmount,
             adjustment_amount=ledger.AdjustmentAmount,
             closing_balance=ledger.ClosingBalance,

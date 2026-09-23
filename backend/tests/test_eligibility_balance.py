@@ -38,7 +38,7 @@ def _get_eligibility(client: TestClient, child_id: str, financial_year: str) -> 
 
 def test_submitting_a_claim_increases_in_progress_amount(login_as) -> None:
     client = login_as(memp_id=960001, employee_id="96000001", Joindate=datetime(2018, 1, 1))
-    child = _add_child(client, "Balance Kid One", "2026-03-01")
+    child = _add_child(client, "Balance Kid One", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
 
     before = _get_eligibility(client, child["child_id"], fy)
@@ -65,7 +65,10 @@ def test_approving_a_claim_moves_amount_from_in_progress_to_approved(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=960002, employee_id="96000002", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Balance Kid Two", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window (2026-09-23), so this claim-approval test isn't affected by
+    # that unrelated feature — see DECISIONS_LOG.md's first-year-payout item.
+    child = _add_child(claimant, "Balance Kid Two", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
     allotted = float(child["eligibility"]["allotted_amount"])
 
@@ -105,7 +108,9 @@ def test_hr_cannot_approve_more_than_remaining_balance(
     cannot approve a second claim that would push cumulative approved
     amounts for this child+FY over the allotted balance."""
     claimant = login_as(memp_id=960004, employee_id="96000004", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Balance Kid Three", "2026-03-01")
+    # Old enough to be past the child's first-13-months first-year-payout
+    # window — see the DOB note on the previous test.
+    child = _add_child(claimant, "Balance Kid Three", "2024-06-01")
     allotted = float(child["eligibility"]["allotted_amount"])
 
     first_claim = claimant.post(
@@ -153,7 +158,7 @@ def test_rejecting_a_claim_removes_it_from_in_progress(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=960006, employee_id="96000006", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Balance Kid Four", "2026-03-01")
+    child = _add_child(claimant, "Balance Kid Four", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
 
     claim = claimant.post(
@@ -184,7 +189,7 @@ def test_send_back_removes_from_in_progress_and_resubmit_restores_it(
     login_as, make_hr_approver, make_employee
 ) -> None:
     claimant = login_as(memp_id=960008, employee_id="96000008", Joindate=datetime(2018, 1, 1))
-    child = _add_child(claimant, "Balance Kid Five", "2026-03-01")
+    child = _add_child(claimant, "Balance Kid Five", "2024-06-01")
     fy = child["eligibility"]["financial_year"]
 
     claim = claimant.post(

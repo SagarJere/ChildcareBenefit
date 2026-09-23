@@ -144,6 +144,17 @@ export async function getPayoutReport(filters: PayoutReportFilters): Promise<Pay
   return data
 }
 
+/** The child's first-13-months auto-paid amounts only, with no claim
+ * involved — the sibling of getPayoutReport's claim-driven payout. */
+export async function getFirstYearPayoutReport(
+  filters: PayoutReportFilters,
+): Promise<PayoutReportResponse> {
+  const { data } = await apiClient.get<PayoutReportResponse>('/hr/reports/payout/first-year', {
+    params: filters,
+  })
+  return data
+}
+
 export async function downloadReportCsv(
   path: string,
   params: Record<string, string | undefined>,

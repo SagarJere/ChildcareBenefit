@@ -113,13 +113,48 @@ def payout_report(
     current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
     db: Session = Depends(get_db),
 ) -> PayoutReportResponse | PlainTextResponse:
+    """Claim-driven payout only (months 14+) — see the sibling
+    `/hr/reports/payout/first-year` for the child's first-13-months
+    auto-paid amounts (DECISIONS_LOG.md's first-year-payout Increment 4)."""
     report = report_service.build_payout_report(
-        db, financial_year=financial_year, employee_id=employee_id, child_id=child_id
+        db,
+        financial_year=financial_year,
+        employee_id=employee_id,
+        child_id=child_id,
+        source="claim",
     )
     if format == "csv":
         return _csv_response(
             [row.model_dump(mode="json") for row in report.rows],
             list(report.rows[0].model_dump().keys()) if report.rows else [],
             "payout-report.csv",
+        )
+    return report
+
+
+@router.get("/hr/reports/payout/first-year", response_model=None)
+def first_year_payout_report(
+    financial_year: str | None = None,
+    employee_id: str | None = None,
+    child_id: str | None = None,
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
+    db: Session = Depends(get_db),
+) -> PayoutReportResponse | PlainTextResponse:
+    """The child's first-13-months auto-paid amounts only, with no claim
+    involved — see the sibling `/hr/reports/payout` for claim-driven
+    payout (months 14+)."""
+    report = report_service.build_payout_report(
+        db,
+        financial_year=financial_year,
+        employee_id=employee_id,
+        child_id=child_id,
+        source="first_year",
+    )
+    if format == "csv":
+        return _csv_response(
+            [row.model_dump(mode="json") for row in report.rows],
+            list(report.rows[0].model_dump().keys()) if report.rows else [],
+            "first-year-payout-report.csv",
         )
     return report
