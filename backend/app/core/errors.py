@@ -18,6 +18,13 @@ class MaxChildrenExceededError(Exception):
     """The employee already has the maximum of two children on record."""
 
 
+class DuplicateChildError(Exception):
+    """A child with this exact name and date of birth already exists for
+    this employee — most likely a duplicate submission (e.g. the user
+    resubmitted after a slow response appeared to hang), not two
+    genuinely different children."""
+
+
 class MissingJoinDateError(Exception):
     """The employee's Joindate is not on file, so eligibility (which
     depends on the employee's joining month) cannot be calculated."""

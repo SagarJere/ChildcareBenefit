@@ -867,3 +867,32 @@
     scope as the earlier local-dev wipe (item — see the full data wipe
     entry earlier in this log). This closes out the first-year-payout
     feature (items 63-67).
+68. Duplicate add-child submission (user-reported 2026-09-24): adding one
+    child on production resulted in two separate `ChildID`s ("Shivaay",
+    same DOB, ~1.5 minutes apart — not a millisecond race like item 55's
+    claim-approval bug, so most likely the free-tier host's cold-start
+    latency made the first attempt look hung and the user resubmitted).
+    The frontend already disables the submit button while the mutation
+    is pending, so this wasn't a same-render double-click; the gap
+    points to a genuinely separate second submission with no
+    server-side duplicate guard to catch it.
+
+    Fixed two ways: (1) `child_service.add_child` now checks the
+    employee's existing active children for an exact name+DOB match
+    (case/whitespace-insensitive) before inserting, raising a new
+    `DuplicateChildError` (409); (2) added `Childcare_ChildMaster.
+    UQ_ChildMaster_Employee_Name_DOB`, a real database-level unique
+    constraint, as a backstop for a genuine concurrent-request race that
+    check-then-insert alone can't close — `add_child` wraps the insert in
+    a SAVEPOINT and catches the resulting `IntegrityError`, the same
+    pattern `financial_year_repository.get_or_create` already uses. Not
+    filtered on `IsActive` since child deactivation isn't implemented.
+
+    Both existing duplicate "Shivaay" records (and their full first-year
+    payout ledgers — each had its own complete, independent eligibility
+    and 20 ledger rows, so the employee was seeing double their correct
+    payout total) were removed as part of a second full production wipe
+    at the user's request ("clear everything except employee and HR
+    data... I test again"), since the new unique constraint couldn't be
+    added while the violating duplicate still existed. Same scope as
+    items 67/the earlier wipe.

@@ -10,6 +10,17 @@ class ChildMaster(Base):
     __tablename__ = "Childcare_ChildMaster"
     __table_args__ = (
         UniqueConstraint("MEmpID", "ChildSequenceNo", name="UQ_ChildMaster_Employee_Sequence"),
+        # Backstop against a duplicate add-child submission (e.g. a slow
+        # response makes the first attempt look hung, the user resubmits,
+        # and both succeed as two separate children) — see
+        # DECISIONS_LOG.md. child_service.add_child already checks for
+        # this before inserting; this constraint guarantees it even under
+        # a genuine race between two concurrent requests. Not filtered on
+        # IsActive since child deactivation isn't implemented yet — would
+        # need revisiting (a filtered/partial index) if it ever is.
+        UniqueConstraint(
+            "MEmpID", "ChildName", "ChildDOB", name="UQ_ChildMaster_Employee_Name_DOB"
+        ),
         Index("IX_ChildMaster_MEmpID", "MEmpID"),
     )
 

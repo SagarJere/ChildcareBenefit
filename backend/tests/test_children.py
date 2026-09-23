@@ -84,6 +84,45 @@ def test_second_child_gets_sequence_two(login_as) -> None:
     assert second.json()["child_id"] == "91000005_2"
 
 
+def test_add_child_rejects_exact_duplicate_name_and_dob(login_as) -> None:
+    """A duplicate submission (e.g. a slow response makes the first
+    attempt look hung, the user resubmits) must not create two children —
+    see DECISIONS_LOG.md."""
+    client = login_as(memp_id=910017, employee_id="91000017", Joindate=datetime(2018, 1, 1))
+
+    first = client.post(
+        "/api/v1/children", json={"child_name": "Shivaay", "child_dob": "2026-08-15"}
+    )
+    assert first.status_code == 201
+
+    # Different casing/whitespace shouldn't defeat the duplicate check.
+    second = client.post(
+        "/api/v1/children", json={"child_name": "  shivaay  ", "child_dob": "2026-08-15"}
+    )
+    assert second.status_code == 409
+    assert "already" in second.json()["message"].lower()
+
+    only_child = client.get("/api/v1/children")
+    assert len(only_child.json()) == 1
+
+
+def test_add_child_allows_same_name_different_dob(login_as) -> None:
+    """The duplicate check is specifically name+DOB together — a
+    different DOB (or, per the sibling test, a different name) is a
+    genuinely different child."""
+    client = login_as(memp_id=910018, employee_id="91000018", Joindate=datetime(2018, 1, 1))
+
+    first = client.post(
+        "/api/v1/children", json={"child_name": "Twin", "child_dob": "2020-01-01"}
+    )
+    second = client.post(
+        "/api/v1/children", json={"child_name": "Twin", "child_dob": "2020-01-02"}
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+
 def test_third_child_is_rejected(login_as) -> None:
     client = login_as(memp_id=910006, employee_id="91000006", Joindate=datetime(2018, 1, 1))
 

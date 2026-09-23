@@ -8,9 +8,15 @@ end, only if every step succeeds; see app/database/session.py's get_db).
 """
 from datetime import date
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import ChildNotFoundError, MaxChildrenExceededError, MissingJoinDateError
+from app.core.errors import (
+    ChildNotFoundError,
+    DuplicateChildError,
+    MaxChildrenExceededError,
+    MissingJoinDateError,
+)
 from app.repositories import child_repository, eligibility_repository, financial_year_repository
 from app.repositories.child_repository import MAX_CHILDREN_PER_EMPLOYEE
 from app.schemas.child import ChildResponse
@@ -79,6 +85,22 @@ def add_child(
     join_date = _require_join_date(employee)
 
     existing_children = child_repository.get_active_children(db, employee.memp_id)
+
+    # Guards against a duplicate submission — e.g. a slow response (a free
+    # hosting tier's cold start can take 30-60s) makes the first attempt
+    # look hung, the user resubmits, and both silently succeed as two
+    # separate children with the same name/DOB. Case-insensitive since a
+    # retyped name may differ only in casing.
+    normalized_name = child_name.strip().casefold()
+    if any(
+        existing.ChildName.strip().casefold() == normalized_name
+        and existing.ChildDOB == child_dob
+        for existing in existing_children
+    ):
+        raise DuplicateChildError(
+            f"A child named {child_name!r} with this date of birth is already on record."
+        )
+
     if len(existing_children) >= MAX_CHILDREN_PER_EMPLOYEE:
         raise MaxChildrenExceededError(
             f"Employee already has the maximum of {MAX_CHILDREN_PER_EMPLOYEE} children."
@@ -93,16 +115,31 @@ def add_child(
     fy_window = eligibility_calculator.compute_financial_year(date.today())
     financial_year_row = financial_year_repository.get_or_create(db, fy_window)
 
-    child = child_repository.create_child(
-        db,
-        child_id=child_id,
-        memp_id=employee.memp_id,
-        employee_id=employee.employee_id,
-        sequence_no=sequence_no,
-        child_name=child_name,
-        child_dob=child_dob,
-        created_by=employee.employee_id,
-    )
+    try:
+        # A SAVEPOINT, not the outer transaction: if a genuinely
+        # concurrent request for this same employee won the race and
+        # already inserted a child with this same name+DOB (the
+        # UQ_ChildMaster_Employee_Name_DOB constraint), only this insert
+        # attempt should be undone — the check above already catches the
+        # common (non-concurrent) case; this is the narrower backstop for
+        # a true race between two in-flight requests.
+        with db.begin_nested():
+            child = child_repository.create_child(
+                db,
+                child_id=child_id,
+                memp_id=employee.memp_id,
+                employee_id=employee.employee_id,
+                sequence_no=sequence_no,
+                child_name=child_name,
+                child_dob=child_dob,
+                created_by=employee.employee_id,
+            )
+    except IntegrityError as exc:
+        raise DuplicateChildError(
+            f"A child named {child_name!r} with this date of birth may already be on "
+            "record, or another request for this employee is still being processed — "
+            "please check My Children before trying again."
+        ) from exc
     eligibility = eligibility_repository.create_eligibility(
         db,
         memp_id=employee.memp_id,

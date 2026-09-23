@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.errors import ChildNotFoundError, MaxChildrenExceededError, MissingJoinDateError
+from app.core.errors import (
+    ChildNotFoundError,
+    DuplicateChildError,
+    MaxChildrenExceededError,
+    MissingJoinDateError,
+)
 from app.database.session import get_db
 from app.dependencies.auth import get_current_employee
 from app.schemas.child import ChildCreateRequest, ChildEligibilityPreviewRequest, ChildResponse
@@ -40,6 +45,8 @@ def create_child(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except MaxChildrenExceededError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except DuplicateChildError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/children", response_model=list[ChildResponse])
