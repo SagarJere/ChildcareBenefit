@@ -1,5 +1,6 @@
 """Keeps Childcare_EligibilityMaster's ApprovedAmount/UtilizedAmount/
-InProgressAmount/RemainingAmount in sync with real claim activity.
+InProgressAmount/RemainingAmount in sync with real claim activity *and*
+first-year auto-pay.
 
 Per user direction 2026-09-20 (see DECISIONS_LOG.md item 44), these
 columns are now real, maintained balances, recomputed from scratch from
@@ -12,6 +13,13 @@ eligibility reports still compute their own figures live from claims
 rather than reading these columns, and now agree with them by
 construction).
 
+`UtilizedAmount`/`RemainingAmount` also fold in the child's first-13-
+months auto-paid total (from Childcare_PayoutMonthlyLedger) — this must
+be called (directly or via recalculate_payout's callers) whenever that
+ledger changes, not just on claim transitions, otherwise `Remaining`
+would overstate what's actually still available and HR could approve a
+claim past the payout calculator's true remaining claimable capacity.
+
 Recomputing from scratch (rather than incrementally adjusting by a delta
 on each transition) avoids any risk of drift from double-counting or a
 missed edge case — the cost of a couple of extra aggregate queries per
@@ -21,7 +29,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.repositories import eligibility_repository, report_repository
+from app.repositories import eligibility_repository, payout_repository, report_repository
 
 
 def sync_balance(db: Session, eligibility_id: int) -> None:
@@ -29,6 +37,7 @@ def sync_balance(db: Session, eligibility_id: int) -> None:
     in_progress_totals = report_repository.get_in_progress_totals_by_eligibility(
         db, [eligibility_id]
     )
+    first_year_payout_totals = payout_repository.get_first_year_payout_totals(db, [eligibility_id])
     eligibility = eligibility_repository.get_by_id(db, eligibility_id)
     assert eligibility is not None
 
@@ -37,4 +46,5 @@ def sync_balance(db: Session, eligibility_id: int) -> None:
         eligibility,
         approved_amount=approved_totals.get(eligibility_id, Decimal("0")),
         in_progress_amount=in_progress_totals.get(eligibility_id, Decimal("0")),
+        first_year_payout_amount=first_year_payout_totals.get(eligibility_id, Decimal("0")),
     )

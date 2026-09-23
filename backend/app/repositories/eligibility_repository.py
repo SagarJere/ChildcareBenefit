@@ -100,18 +100,27 @@ def update_balance(
     *,
     approved_amount: Decimal,
     in_progress_amount: Decimal,
+    first_year_payout_amount: Decimal = Decimal("0"),
 ) -> EligibilityMaster:
-    """Recomputes and persists the maintained balance columns. `Utilized`
-    is kept equal to `Approved` — the same meaning "Utilized" already has
-    in the HR and employee eligibility reports (DECISIONS_LOG.md items 32,
-    41), now mirrored into this stored column instead of leaving it at its
-    initial zero. `Remaining` (the "balance" HR's approved amount is
-    checked against) is Allotted minus Approved — it deliberately does not
-    reserve against In Progress claims, per the same convention."""
+    """Recomputes and persists the maintained balance columns.
+
+    `Approved` stays claim-approved only — first-year payout was never an
+    HR approval action. `Utilized` and `Remaining` both now account for
+    *both* sources of real money paid out: claim-approved amounts and the
+    child's first-13-months auto-pay (`first_year_payout_amount`, from
+    Childcare_PayoutMonthlyLedger — see DECISIONS_LOG.md's first-year-
+    payout follow-up). This matters most for `Remaining`, since HR's
+    approval cap in hr_service.approve_claim is checked against it —
+    without subtracting first-year payout too, HR could approve more than
+    the payout calculator's remaining *claimable* capacity actually
+    allows, and recalculate_payout would raise PayoutCapacityExceededError.
+    `Remaining` deliberately still does not reserve against In Progress
+    claims, per the pre-existing convention."""
+    utilized_amount = approved_amount + first_year_payout_amount
     eligibility.ApprovedAmount = approved_amount
-    eligibility.UtilizedAmount = approved_amount
+    eligibility.UtilizedAmount = utilized_amount
     eligibility.InProgressAmount = in_progress_amount
-    eligibility.RemainingAmount = eligibility.AllottedAmount - approved_amount
+    eligibility.RemainingAmount = eligibility.AllottedAmount - utilized_amount
     eligibility.UpdatedDate = _utc_now_naive()
     db.flush()
     return eligibility

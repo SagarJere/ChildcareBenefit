@@ -142,11 +142,19 @@ def build_eligibility_utilization(
     in_progress_totals = report_repository.get_in_progress_totals_by_eligibility(
         db, eligibility_ids
     )
+    # Folded into remaining_after_approved below — see
+    # eligibility_repository.update_balance's docstring: first-year
+    # auto-pay is real money paid out too, and must be subtracted or this
+    # report would overstate what's actually still available (and
+    # disagree with the maintained EligibilityMaster.RemainingAmount
+    # column it's supposed to agree with "by construction").
+    first_year_payout_totals = payout_repository.get_first_year_payout_totals(db, eligibility_ids)
 
     rows = []
     for row in eligibility_rows:
         approved = approved_totals.get(row.EligibilityID, Decimal("0"))
         in_progress = in_progress_totals.get(row.EligibilityID, Decimal("0"))
+        first_year_payout = first_year_payout_totals.get(row.EligibilityID, Decimal("0"))
         rows.append(
             EligibilityUtilizationRow(
                 eligibility_id=row.EligibilityID,
@@ -160,7 +168,7 @@ def build_eligibility_utilization(
                 allotted_amount=row.AllottedAmount,
                 in_progress_amount=in_progress,
                 approved_amount=approved,
-                remaining_after_approved=row.AllottedAmount - approved,
+                remaining_after_approved=row.AllottedAmount - approved - first_year_payout,
             )
         )
 
@@ -190,11 +198,15 @@ def build_employee_eligibility_report(
         db, eligibility_ids
     )
     last_activity = report_repository.get_last_activity_by_eligibility(db, eligibility_ids)
+    # See the matching comment in build_eligibility_utilization above.
+    first_year_payout_totals = payout_repository.get_first_year_payout_totals(db, eligibility_ids)
 
     rows = []
     for row in eligibility_rows:
-        utilized = approved_totals.get(row.EligibilityID, Decimal("0"))
+        approved = approved_totals.get(row.EligibilityID, Decimal("0"))
         in_progress = in_progress_totals.get(row.EligibilityID, Decimal("0"))
+        first_year_payout = first_year_payout_totals.get(row.EligibilityID, Decimal("0"))
+        utilized = approved + first_year_payout
         rows.append(
             EmployeeEligibilityReportRow(
                 eligibility_id=row.EligibilityID,

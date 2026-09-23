@@ -896,3 +896,49 @@
     data... I test again"), since the new unique constraint couldn't be
     added while the violating duplicate still existed. Same scope as
     items 67/the earlier wipe.
+69. First-year payout was never counted as utilized anywhere (user-caught
+    2026-09-23 with "Isnt first year payout will be utilised amount.?").
+    `child_service.add_child` populated `Childcare_PayoutMonthlyLedger`
+    with first-year auto-pay rows (items 63-64) but never called
+    `eligibility_balance_service.sync_balance` afterward, and even where
+    `sync_balance` *is* called elsewhere, it only ever summed claim-
+    approved amounts — so `EligibilityMaster.UtilizedAmount`/
+    `RemainingAmount` stayed at their initial (no-payout-yet) values
+    despite real money already having been auto-paid. Practical risk: HR
+    could approve a claim up to the inflated `RemainingAmount`, exceeding
+    the payout calculator's true remaining *claimable* capacity (first-
+    year months are removed from that pool entirely — see
+    `payout_calculator.py`), which would then raise
+    `PayoutCapacityExceededError` instead of being caught by HR's normal
+    balance-cap check.
+
+    Fixed in three places, all following the same rule — "utilized" and
+    "remaining" must account for claim-approved *and* first-year auto-
+    paid amounts, not claim-approved alone:
+    - `payout_repository.get_first_year_payout_totals` (new, batched —
+      matches `get_approved_totals_by_eligibility`'s convention): sums
+      `FirstYearPayoutAmount` per `EligibilityID`.
+    - `eligibility_repository.update_balance` now takes
+      `first_year_payout_amount` and folds it into `UtilizedAmount`
+      (`ApprovedAmount` stays claim-approved only) and `RemainingAmount`;
+      `eligibility_balance_service.sync_balance` fetches and passes it;
+      `child_service.add_child` now calls `sync_balance` right after each
+      `recalculate_payout` call (current- and next-FY branches both).
+    - The two live-computed reports that are supposed to agree with the
+      stored columns "by construction" (item 32's comment) had the
+      identical bug independently: `report_service.
+      build_eligibility_utilization` (`remaining_after_approved`) and
+      `build_employee_eligibility_report` (`utilized_amount`/
+      `balance_amount`) both now also subtract/include first-year payout
+      totals, fetched the same batched way.
+
+    Verified with the project's standard revert/restore methodology
+    (write the test, confirm it fails against the un-fixed code, restore
+    the fix, confirm it passes) for all four fixes — see
+    `test_first_year_payout.py`'s
+    `test_add_child_with_first_year_payout_updates_eligibility_balance`,
+    `test_hr_approval_cap_accounts_for_first_year_payout_already_consumed`,
+    `test_hr_eligibility_utilization_report_accounts_for_first_year_payout`,
+    and `test_employee_eligibility_report_accounts_for_first_year_payout`.
+    No production data repair needed — production had just been fully
+    wiped (item 68) with no children added since.

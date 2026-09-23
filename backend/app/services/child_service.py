@@ -22,7 +22,7 @@ from app.repositories.child_repository import MAX_CHILDREN_PER_EMPLOYEE
 from app.schemas.child import ChildResponse
 from app.schemas.eligibility import EligibilityPreview, EligibilityResponse
 from app.schemas.employee import EmployeeProfile
-from app.services import eligibility_calculator, payout_service
+from app.services import eligibility_balance_service, eligibility_calculator, payout_service
 
 
 def _has_first_year_payout(
@@ -158,6 +158,11 @@ def add_child(
     # ledger rows before any claim exists.
     if _has_first_year_payout(calculation, child_dob):
         payout_service.recalculate_payout(db, eligibility.EligibilityID)
+        # Without this, UtilizedAmount/RemainingAmount would stay at
+        # their initial (no-payout-yet) defaults despite real money
+        # already having been auto-paid — see DECISIONS_LOG.md's
+        # first-year-payout follow-up.
+        eligibility_balance_service.sync_balance(db, eligibility.EligibilityID)
 
     # By default, eligibility also extends one financial year ahead,
     # capped at the child's 72nd month/6th birthday — see
@@ -184,6 +189,7 @@ def add_child(
         )
         if _has_first_year_payout(next_calculation, child_dob):
             payout_service.recalculate_payout(db, next_eligibility.EligibilityID)
+            eligibility_balance_service.sync_balance(db, next_eligibility.EligibilityID)
 
     return ChildResponse.from_orm_model(child, EligibilityResponse.from_orm_model(eligibility))
 

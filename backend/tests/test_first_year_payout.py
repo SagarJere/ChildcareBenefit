@@ -319,3 +319,121 @@ def test_employee_first_year_payout_report_is_scoped_to_own_children(
     rows = own_view.json()["rows"]
     assert len(rows) == 2
     assert all(row["employee_id"] == "91000013" for row in rows)
+
+
+def test_add_child_with_first_year_payout_updates_eligibility_balance(login_as) -> None:
+    """Without this, UtilizedAmount/RemainingAmount would stay at their
+    initial (no-payout-yet) defaults despite real money already having
+    been auto-paid for the child's first-13-months window."""
+    client = login_as(memp_id=910015, employee_id="91000015", Joindate=datetime(2018, 1, 1))
+    # Entire current-FY window is first-year (born this month).
+    child = _add_child(client, "First Year Kid Twelve", "2026-09-01")
+
+    eligibility = child["eligibility"]
+    allotted = float(eligibility["allotted_amount"])
+    expected_first_year_total = 14000.0 * eligibility["eligible_months"]
+    assert allotted == expected_first_year_total
+
+    assert float(eligibility["utilized_amount"]) == expected_first_year_total
+    assert float(eligibility["approved_amount"]) == 0.0
+    assert float(eligibility["remaining_amount"]) == allotted - expected_first_year_total
+
+
+def test_hr_approval_cap_accounts_for_first_year_payout_already_consumed(
+    login_as, make_hr_approver, make_employee
+) -> None:
+    """The bug this guards against: before RemainingAmount subtracted
+    first-year payout too, HR could approve a claim for more than the
+    payout calculator's true remaining *claimable* capacity (since
+    first-year months are removed from that pool entirely — see
+    payout_calculator.py) — recalculate_payout would then raise
+    PayoutCapacityExceededError. Now HR's approval is correctly capped
+    before that can happen."""
+    claimant = login_as(memp_id=910016, employee_id="91000016", Joindate=datetime(2018, 1, 1))
+    # Same DOB as the reports-split test: month 13 = Apr 2026 (first-year,
+    # auto-paid 14,000), month 14 onward = May 2026+ (claimable). Current
+    # FY allotment is 12 * 14000 = 168,000; true remaining claimable
+    # capacity is only 11 * 14000 = 154,000.
+    child = _add_child(claimant, "First Year Kid Thirteen", "2025-04-01")
+    allotted = float(child["eligibility"]["allotted_amount"])
+    assert allotted == 168000.0
+    assert float(child["eligibility"]["remaining_amount"]) == 154000.0
+
+    claim = claimant.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-06-01",
+            "invoice_number": "INV-FY-CAP",
+            "invoice_amount": "160000.00",
+        },
+    ).json()
+    claimant.post(f"/api/v1/claims/{claim['claim_id']}/submit")
+
+    make_employee(memp_id=910017, employee_id="91000017", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("91000017")
+    _login_as_existing(claimant, "91000017")
+    hr_client = claimant
+
+    # 160,000 is within the (buggy) old RemainingAmount of 168,000 but
+    # exceeds the true remaining claimable capacity of 154,000.
+    approve = hr_client.post(
+        f"/api/v1/hr/claims/{claim['claim_id']}/approve", json={"approved_amount": "160000.00"}
+    )
+    assert approve.status_code == 400
+    assert "remaining balance" in approve.json()["message"].lower()
+
+    # A claim within the true remaining capacity succeeds without error.
+    within_capacity = hr_client.post(
+        f"/api/v1/hr/claims/{claim['claim_id']}/approve", json={"approved_amount": "154000.00"}
+    )
+    assert within_capacity.status_code == 200
+
+
+def test_hr_eligibility_utilization_report_accounts_for_first_year_payout(
+    login_as, make_hr_approver, make_employee
+) -> None:
+    """Same bug as test_hr_approval_cap_accounts_for_first_year_payout_
+    already_consumed, but in the live-computed HR "Eligibility
+    Utilization" report rather than the stored EligibilityMaster columns
+    — build_eligibility_utilization used to compute remaining_after_
+    approved from AllottedAmount minus *approved claims only*, ignoring
+    first-year auto-pay entirely."""
+    claimant = login_as(memp_id=910018, employee_id="91000018", Joindate=datetime(2018, 1, 1))
+    # Same DOB/shape as the approval-cap test: allotted 168,000, of which
+    # 14,000 is auto-paid as first-year (month 13 = Apr 2026).
+    child = _add_child(claimant, "First Year Kid Fourteen", "2025-04-01")
+    fy = child["eligibility"]["financial_year"]
+
+    make_employee(memp_id=910019, employee_id="91000019", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("91000019")
+    _login_as_existing(claimant, "91000019")
+    hr_client = claimant
+
+    report = hr_client.get(
+        "/api/v1/hr/reports/eligibility-utilization",
+        params={"employee_id": "91000018", "financial_year": fy},
+    )
+    assert report.status_code == 200
+    rows = report.json()["rows"]
+    assert len(rows) == 1
+    assert float(rows[0]["allotted_amount"]) == 168000.0
+    assert float(rows[0]["approved_amount"]) == 0.0
+    assert float(rows[0]["remaining_after_approved"]) == 154000.0
+
+
+def test_employee_eligibility_report_accounts_for_first_year_payout(login_as) -> None:
+    """Same bug as above, in the employee-facing "Eligibility & Payout"
+    report (build_employee_eligibility_report) that HomePage.tsx's
+    per-FY remaining-balance breakdown consumes."""
+    client = login_as(memp_id=910020, employee_id="91000020", Joindate=datetime(2018, 1, 1))
+    child = _add_child(client, "First Year Kid Fifteen", "2025-04-01")
+    fy = child["eligibility"]["financial_year"]
+
+    report = client.get("/api/v1/eligibility/report")
+    assert report.status_code == 200
+    rows = [row for row in report.json()["rows"] if row["financial_year"] == fy]
+    assert len(rows) == 1
+    assert float(rows[0]["allotted_amount"]) == 168000.0
+    assert float(rows[0]["utilized_amount"]) == 14000.0
+    assert float(rows[0]["balance_amount"]) == 154000.0

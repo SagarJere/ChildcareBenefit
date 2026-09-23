@@ -1,7 +1,9 @@
 """Data access for the payout ledger/allocation — see
 PAYOUT_REQUIREMENTS.md and app/services/payout_service.py.
 """
-from sqlalchemy import select
+from decimal import Decimal
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.claim import APPROVED, ClaimMaster
@@ -14,6 +16,30 @@ from app.services.payout_calculator import (
     MonthlyLedgerEntry,
     PayoutAllocationEntry,
 )
+
+
+def get_first_year_payout_totals(
+    db: Session, eligibility_ids: list[int]
+) -> dict[int, Decimal]:
+    """SUM of FirstYearPayoutAmount per EligibilityID — the child's
+    first-13-months auto-paid total, with no claim involved. Used
+    everywhere "remaining"/"balance" is computed from AllottedAmount
+    minus claim-approved amounts, so it correctly accounts for
+    first-year payout too — otherwise it overstates what's actually
+    still available (see DECISIONS_LOG.md's first-year-payout
+    follow-up). Batched to match report_repository.
+    get_approved_totals_by_eligibility's convention."""
+    if not eligibility_ids:
+        return {}
+
+    rows = db.execute(
+        select(
+            PayoutMonthlyLedger.EligibilityID, func.sum(PayoutMonthlyLedger.FirstYearPayoutAmount)
+        )
+        .where(PayoutMonthlyLedger.EligibilityID.in_(eligibility_ids))
+        .group_by(PayoutMonthlyLedger.EligibilityID)
+    ).all()
+    return {eligibility_id: total for eligibility_id, total in rows if total is not None}
 
 
 def get_approved_claims_with_approval_time(
