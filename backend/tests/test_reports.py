@@ -61,6 +61,9 @@ def test_claims_summary_reflects_filters_and_totals(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-R-1",
             "invoice_amount": "1000.00",
         },
@@ -72,6 +75,9 @@ def test_claims_summary_reflects_filters_and_totals(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-01",
+            "to_date": "2026-09-01",
             "invoice_number": "INV-R-2",
             "invoice_amount": "500.00",
         },
@@ -128,6 +134,9 @@ def test_claims_summary_csv_format(login_as, make_hr_approver, make_employee) ->
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-R-3",
             "invoice_amount": "1000.00",
         },
@@ -162,6 +171,9 @@ def test_eligibility_utilization_computes_live_totals(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-R-4",
             "invoice_amount": "1000.00",
         },
@@ -173,6 +185,9 @@ def test_eligibility_utilization_computes_live_totals(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-01",
+            "to_date": "2026-09-01",
             "invoice_number": "INV-R-5",
             "invoice_amount": "500.00",
         },

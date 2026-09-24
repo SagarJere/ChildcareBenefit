@@ -58,6 +58,9 @@ export function ClaimDetailPage() {
         invoice_date: values.invoiceDate,
         invoice_number: values.invoiceNumber,
         invoice_amount: values.invoiceAmount,
+        institution_name: values.institutionName,
+        from_date: values.fromDate,
+        to_date: values.toDate,
         comments: values.comments?.trim() || undefined,
       }),
     onSuccess: async () => {
@@ -272,6 +275,9 @@ function ClaimDetailsForm({
     invoice_date: string
     invoice_number: string
     invoice_amount: string
+    institution_name: string | null
+    from_date: string | null
+    to_date: string | null
     comments: string | null
   }
   isEditable: boolean
@@ -288,6 +294,9 @@ function ClaimDetailsForm({
       invoiceDate: claim.invoice_date,
       invoiceNumber: claim.invoice_number,
       invoiceAmount: claim.invoice_amount,
+      institutionName: claim.institution_name ?? '',
+      fromDate: claim.from_date ?? '',
+      toDate: claim.to_date ?? '',
       comments: claim.comments ?? '',
     },
   })
@@ -305,6 +314,20 @@ function ClaimDetailsForm({
           <dd className="text-right font-medium text-slate-900">
             {formatCurrency(claim.invoice_amount)}
           </dd>
+          {claim.institution_name && (
+            <>
+              <dt className="text-slate-500">Institution</dt>
+              <dd className="text-right font-medium text-slate-900">{claim.institution_name}</dd>
+            </>
+          )}
+          {claim.from_date && claim.to_date && (
+            <>
+              <dt className="text-slate-500">Service period</dt>
+              <dd className="text-right font-medium text-slate-900">
+                {formatDate(claim.from_date)} – {formatDate(claim.to_date)}
+              </dd>
+            </>
+          )}
         </dl>
         {claim.comments && (
           <div className="mt-4 border-t border-slate-100 pt-3">
@@ -380,6 +403,62 @@ function ClaimDetailsForm({
             {errors.invoiceAmount.message}
           </p>
         )}
+      </div>
+
+      <div>
+        <label htmlFor="institutionName" className="block text-sm font-medium text-slate-700">
+          Institution name
+        </label>
+        <input
+          id="institutionName"
+          type="text"
+          maxLength={200}
+          className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          {...register('institutionName')}
+        />
+        {errors.institutionName && (
+          <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {errors.institutionName.message}
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="fromDate" className="block text-sm font-medium text-slate-700">
+            From date
+          </label>
+          <input
+            id="fromDate"
+            type="date"
+            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            {...register('fromDate')}
+          />
+          {errors.fromDate && (
+            <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {errors.fromDate.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label htmlFor="toDate" className="block text-sm font-medium text-slate-700">
+            To date
+          </label>
+          <input
+            id="toDate"
+            type="date"
+            className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            {...register('toDate')}
+          />
+          {errors.toDate && (
+            <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              {errors.toDate.message}
+            </p>
+          )}
+        </div>
       </div>
 
       <div>

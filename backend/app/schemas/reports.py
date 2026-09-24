@@ -14,6 +14,9 @@ class ClaimSummaryRow(BaseModel):
     invoice_number: str
     invoice_amount: Decimal
     claim_amount: Decimal
+    institution_name: str | None
+    from_date: date | None
+    to_date: date | None
     claim_status: str
     submitted_date: datetime | None
     approved_date: datetime | None
@@ -46,6 +49,13 @@ class EligibilityUtilizationRow(BaseModel):
     # (never-updated) balance columns.
     in_progress_amount: Decimal
     approved_amount: Decimal
+    # The child's first-13-months auto-paid total (Childcare_
+    # PayoutMonthlyLedger) — shown as its own column so it's never just
+    # an invisible gap between allotted_amount and remaining_after_
+    # approved (user-caught 2026-09-24: "approved is showing 0, it
+    # should have been 56k" for a child with only first-year payout and
+    # no claims at all).
+    first_year_payout_amount: Decimal
     remaining_after_approved: Decimal
 
 
@@ -53,6 +63,7 @@ class EligibilityUtilizationTotals(BaseModel):
     total_allotted_amount: Decimal
     total_in_progress_amount: Decimal
     total_approved_amount: Decimal
+    total_first_year_payout_amount: Decimal
 
 
 class EligibilityUtilizationResponse(BaseModel):

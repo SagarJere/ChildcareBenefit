@@ -150,6 +150,28 @@ def claim_requires_documents(*, child_dob: date, invoice_date: date) -> bool:
     )
 
 
+MIN_CLAIMABLE_CHILD_MONTH = FIRST_YEAR_PAYOUT_CHILD_MONTHS + 1  # 14
+MAX_CLAIMABLE_CHILD_MONTH = SIX_YEAR_LIMIT_YEARS * 12  # 72
+
+
+def is_valid_claim_from_date(*, child_dob: date, from_date: date) -> bool:
+    """A claim's service-period From Date (user direction 2026-09-24) must
+    fall at or after the child's 14th month — the first 13 months are
+    paid automatically, so there is nothing to claim before that."""
+    return child_month_number(child_dob=child_dob, invoice_date=from_date) >= (
+        MIN_CLAIMABLE_CHILD_MONTH
+    )
+
+
+def is_valid_claim_to_date(*, child_dob: date, to_date: date) -> bool:
+    """A claim's service-period To Date (user direction 2026-09-24) must
+    fall at or before the child's 72nd month (6th birthday) — the same
+    cutoff eligibility itself ends at."""
+    return child_month_number(child_dob=child_dob, invoice_date=to_date) <= (
+        MAX_CLAIMABLE_CHILD_MONTH
+    )
+
+
 def is_first_year_payout_month(*, child_dob: date, month: date) -> bool:
     """True for the child's first 13 months of life (month 1 = birth
     month) — the period that is paid automatically, with no employee

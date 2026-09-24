@@ -64,6 +64,9 @@ def test_payout_report_shows_apr_to_mar_breakdown_and_supports_filters(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-PAYOUT-RPT-1",
             "invoice_amount": "9000.00",
         },
@@ -120,6 +123,9 @@ def test_payout_report_csv_format(login_as, make_hr_approver, make_employee) -> 
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-PAYOUT-RPT-2",
             "invoice_amount": "5000.00",
         },
@@ -160,6 +166,9 @@ def test_employee_payout_report_is_scoped_to_own_children(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-PAYOUT-RPT-3",
             "invoice_amount": "7000.00",
         },
@@ -201,6 +210,9 @@ def test_employee_payout_report_csv_format(login_as, make_hr_approver, make_empl
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-PAYOUT-RPT-4",
             "invoice_amount": "3000.00",
         },

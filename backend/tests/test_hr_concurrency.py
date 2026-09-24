@@ -76,6 +76,9 @@ def test_concurrent_approve_processes_the_claim_only_once(monkeypatch: pytest.Mo
                 invoice_date=date.today(),
                 invoice_number="INV-CONCURRENCY-1",
                 invoice_amount=Decimal("1000.00"),
+                institution_name="Test Institution",
+                from_date=date.today(),
+                to_date=date.today(),
             ),
         )
         claim_service.submit_claim(setup_session, employee, claim.claim_id)
@@ -203,6 +206,14 @@ def test_concurrent_approve_processes_the_claim_only_once(monkeypatch: pytest.Mo
         finally:
             verify_session.close()
     finally:
+        # Without this, a failure anywhere in the setup block above (e.g. a
+        # schema/validation change breaking the direct ClaimCreateRequest(...)
+        # construction) leaves this session's transaction open and orphaned
+        # on the server indefinitely, holding row locks that silently block
+        # any later test needing the same rows for minutes until something
+        # notices and kills the session — exactly what happened here.
+        setup_session.close()
+
         cleanup_session = Session(bind=engine)
         try:
             eligibility_ids = [

@@ -86,3 +86,10 @@ class InvalidApprovedAmountError(Exception):
     """The approved amount is not positive, exceeds the invoice amount, or
     exceeds the child's remaining eligibility balance for that financial
     year (see DECISIONS_LOG.md item 44)."""
+
+
+class InvalidServicePeriodError(Exception):
+    """The claim's From Date/To Date service period is invalid: From Date
+    falls before the child turns 14 months old, To Date falls after the
+    child turns 72 months old, or From Date is after To Date (user
+    direction 2026-09-24)."""

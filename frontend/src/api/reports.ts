@@ -11,6 +11,9 @@ export interface ClaimSummaryRow {
   invoice_number: string
   invoice_amount: string
   claim_amount: string
+  institution_name: string | null
+  from_date: string | null
+  to_date: string | null
   claim_status: Claim['claim_status']
   submitted_date: string | null
   approved_date: string | null
@@ -38,6 +41,7 @@ export interface EligibilityUtilizationRow {
   allotted_amount: string
   in_progress_amount: string
   approved_amount: string
+  first_year_payout_amount: string
   remaining_after_approved: string
 }
 
@@ -47,6 +51,7 @@ export interface EligibilityUtilizationResponse {
     total_allotted_amount: string
     total_in_progress_amount: string
     total_approved_amount: string
+    total_first_year_payout_amount: string
   }
 }
 

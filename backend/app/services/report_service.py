@@ -96,6 +96,9 @@ def build_claims_summary(
             invoice_number=claim.InvoiceNumber,
             invoice_amount=claim.InvoiceAmount,
             claim_amount=claim.ClaimAmount,
+            institution_name=claim.InstitutionName,
+            from_date=claim.FromDate,
+            to_date=claim.ToDate,
             claim_status=claim.ClaimStatus,
             submitted_date=claim.SubmittedDate,
             approved_date=approved_dates.get(claim.ClaimID),
@@ -168,6 +171,7 @@ def build_eligibility_utilization(
                 allotted_amount=row.AllottedAmount,
                 in_progress_amount=in_progress,
                 approved_amount=approved,
+                first_year_payout_amount=first_year_payout,
                 remaining_after_approved=row.AllottedAmount - approved - first_year_payout,
             )
         )
@@ -178,6 +182,9 @@ def build_eligibility_utilization(
             total_allotted_amount=sum((r.allotted_amount for r in rows), Decimal("0")),
             total_in_progress_amount=sum((r.in_progress_amount for r in rows), Decimal("0")),
             total_approved_amount=sum((r.approved_amount for r in rows), Decimal("0")),
+            total_first_year_payout_amount=sum(
+                (r.first_year_payout_amount for r in rows), Decimal("0")
+            ),
         ),
     )
 

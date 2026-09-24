@@ -21,6 +21,13 @@ InProgressAmount/RemainingAmount are now maintained balances (superseding
 item 20 for these specific columns) — submitting a claim here triggers a
 recompute via eligibility_balance_service, since it changes which claims
 count toward "In Progress".
+
+Per user direction 2026-09-24, a claim also carries InstitutionName and a
+From Date/To Date service period, validated against the child's age in
+months (From Date >= 14 months, To Date <= 72 months) — these are
+descriptive fields only and do not affect which EligibilityID the claim
+posts against (still InvoiceDate) or payout allocation (still HR approval
+time).
 """
 import io
 import re
@@ -39,9 +46,11 @@ from app.core.errors import (
     DuplicateInvoiceError,
     FileTooLargeError,
     FirstYearPayoutPeriodError,
+    InvalidServicePeriodError,
     InvalidUploadError,
     NoEligibilityForPeriodError,
 )
+from app.models.child import ChildMaster
 from app.models.claim import DRAFT, SENT_BACK
 from app.models.eligibility import EligibilityMaster
 from app.repositories import (
@@ -74,13 +83,16 @@ def _employee_display_name(db: Session, employee_id: str) -> str:
     return employee_id
 
 
-def _resolve_eligibility_for_invoice(
-    db: Session, employee: EmployeeProfile, child_id: str, invoice_date: date
-) -> EligibilityMaster:
+def _get_child_or_raise(db: Session, employee: EmployeeProfile, child_id: str) -> ChildMaster:
     child = child_repository.get_child_for_employee(db, employee.memp_id, child_id)
     if child is None:
         raise ChildNotFoundError(f"No child {child_id} found for this employee.")
+    return child
 
+
+def _resolve_eligibility_for_invoice(
+    db: Session, employee: EmployeeProfile, child: ChildMaster, invoice_date: date
+) -> EligibilityMaster:
     if eligibility_calculator.is_first_year_payout_month(
         child_dob=child.ChildDOB, month=invoice_date
     ):
@@ -90,12 +102,32 @@ def _resolve_eligibility_for_invoice(
         )
 
     fy = eligibility_calculator.compute_financial_year(invoice_date)
-    rows = eligibility_repository.get_for_child(db, employee.memp_id, child_id, fy.label)
+    rows = eligibility_repository.get_for_child(db, employee.memp_id, child.ChildID, fy.label)
     if not rows:
         raise NoEligibilityForPeriodError(
             f"No eligibility record exists for this child in financial year {fy.label}."
         )
     return rows[0]
+
+
+def _validate_service_period(child: ChildMaster, from_date: date, to_date: date) -> None:
+    """From Date/To Date are descriptive fields recording the service
+    period an institution's invoice covers (user direction 2026-09-24) —
+    they don't affect which EligibilityID the claim posts against (still
+    InvoiceDate) or payout allocation (still HR approval time), but are
+    validated against the child's age in months so a claim can't be
+    raised for a period that was never claimable in the first place."""
+    if not eligibility_calculator.is_valid_claim_from_date(
+        child_dob=child.ChildDOB, from_date=from_date
+    ):
+        raise InvalidServicePeriodError(
+            "From Date must be at least 14 months after the child's date of birth — the "
+            "first 13 months are paid automatically, with no claim needed."
+        )
+    if not eligibility_calculator.is_valid_claim_to_date(child_dob=child.ChildDOB, to_date=to_date):
+        raise InvalidServicePeriodError(
+            "To Date cannot be more than 72 months (6 years) after the child's date of birth."
+        )
 
 
 def _check_duplicate_invoice(
@@ -151,9 +183,9 @@ def create_claim(
     db: Session, employee: EmployeeProfile, payload: ClaimCreateRequest
 ) -> ClaimResponse:
     _check_duplicate_invoice(db, employee, payload.child_id, payload.invoice_number)
-    eligibility = _resolve_eligibility_for_invoice(
-        db, employee, payload.child_id, payload.invoice_date
-    )
+    child = _get_child_or_raise(db, employee, payload.child_id)
+    eligibility = _resolve_eligibility_for_invoice(db, employee, child, payload.invoice_date)
+    _validate_service_period(child, payload.from_date, payload.to_date)
     claim = claim_repository.create_claim(
         db,
         memp_id=employee.memp_id,
@@ -163,6 +195,9 @@ def create_claim(
         invoice_date=payload.invoice_date,
         invoice_number=payload.invoice_number,
         invoice_amount=payload.invoice_amount,
+        institution_name=payload.institution_name,
+        from_date=payload.from_date,
+        to_date=payload.to_date,
         comments=payload.comments,
         created_by=employee.employee_id,
     )
@@ -197,9 +232,9 @@ def update_claim(
         payload.invoice_number,
         exclude_claim_id=claim.ClaimID,
     )
-    eligibility = _resolve_eligibility_for_invoice(
-        db, employee, claim.ChildID, payload.invoice_date
-    )
+    child = _get_child_or_raise(db, employee, claim.ChildID)
+    eligibility = _resolve_eligibility_for_invoice(db, employee, child, payload.invoice_date)
+    _validate_service_period(child, payload.from_date, payload.to_date)
     claim_repository.update_claim(
         db,
         claim,
@@ -207,6 +242,9 @@ def update_claim(
         invoice_date=payload.invoice_date,
         invoice_number=payload.invoice_number,
         invoice_amount=payload.invoice_amount,
+        institution_name=payload.institution_name,
+        from_date=payload.from_date,
+        to_date=payload.to_date,
         comments=payload.comments,
         updated_by=employee.employee_id,
     )

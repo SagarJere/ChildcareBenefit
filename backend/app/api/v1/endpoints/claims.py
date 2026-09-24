@@ -10,6 +10,7 @@ from app.core.errors import (
     DuplicateInvoiceError,
     FileTooLargeError,
     FirstYearPayoutPeriodError,
+    InvalidServicePeriodError,
     InvalidUploadError,
     NoEligibilityForPeriodError,
 )
@@ -40,6 +41,8 @@ def create_claim(
     except FirstYearPayoutPeriodError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except NoEligibilityForPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InvalidServicePeriodError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except DuplicateInvoiceError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
@@ -81,6 +84,8 @@ def update_claim(
     except FirstYearPayoutPeriodError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except NoEligibilityForPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InvalidServicePeriodError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except DuplicateInvoiceError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

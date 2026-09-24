@@ -76,6 +76,22 @@ export function ClaimDetailModal({
               <dd className="text-right font-medium text-slate-900">
                 {formatCurrency(claim.invoice_amount)}
               </dd>
+              {claim.institution_name && (
+                <>
+                  <dt className="text-slate-500">Institution</dt>
+                  <dd className="text-right font-medium text-slate-900">
+                    {claim.institution_name}
+                  </dd>
+                </>
+              )}
+              {claim.from_date && claim.to_date && (
+                <>
+                  <dt className="text-slate-500">Service period</dt>
+                  <dd className="text-right font-medium text-slate-900">
+                    {formatDate(claim.from_date)} – {formatDate(claim.to_date)}
+                  </dd>
+                </>
+              )}
               {claim.submitted_date && (
                 <>
                   <dt className="text-slate-500">Submitted date</dt>

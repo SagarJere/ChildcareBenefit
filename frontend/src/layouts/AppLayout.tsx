@@ -14,7 +14,7 @@ export function AppLayout() {
   return (
     <div className="flex min-h-svh flex-col">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-4">
+        <div className="mx-auto flex max-w-[90rem] items-center gap-2 px-4 py-4">
           <HeartHandshake className="h-6 w-6 text-indigo-700" aria-hidden="true" />
           <span className="text-lg font-semibold text-slate-900">Childcare Benefit</span>
 
@@ -90,7 +90,7 @@ export function AppLayout() {
           )}
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 py-8">
         <Outlet />
       </main>
     </div>

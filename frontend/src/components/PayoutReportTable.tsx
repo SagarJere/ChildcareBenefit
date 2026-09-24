@@ -27,6 +27,7 @@ export function PayoutReportTable({ rows }: { rows: PayoutReportRow[] }) {
           <tr>
             <th className="px-3 py-3">Employee ID</th>
             <th className="px-3 py-3">Employee</th>
+            <th className="px-3 py-3">Child ID</th>
             <th className="px-3 py-3">Child</th>
             <th className="px-3 py-3">Child DOB</th>
             <th className="px-3 py-3">FY</th>
@@ -43,6 +44,7 @@ export function PayoutReportTable({ rows }: { rows: PayoutReportRow[] }) {
             <tr key={`${row.employee_id}-${row.child_id}-${row.financial_year}`}>
               <td className="px-3 py-3 whitespace-nowrap text-slate-600">{row.employee_id}</td>
               <td className="px-3 py-3 whitespace-nowrap text-slate-800">{row.employee_name}</td>
+              <td className="px-3 py-3 whitespace-nowrap text-slate-600">{row.child_id}</td>
               <td className="px-3 py-3 whitespace-nowrap text-slate-600">{row.child_name}</td>
               <td className="px-3 py-3 whitespace-nowrap text-slate-600">
                 {formatDate(row.child_dob)}
@@ -63,7 +65,7 @@ export function PayoutReportTable({ rows }: { rows: PayoutReportRow[] }) {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={18} className="px-4 py-6 text-center text-slate-400">
+              <td colSpan={19} className="px-4 py-6 text-center text-slate-400">
                 No payouts match these filters.
               </td>
             </tr>

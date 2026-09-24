@@ -990,3 +990,60 @@
     had its per-row assertion loosened to an aggregate total, since which
     row receives the bundle now depends on "today" (the exact math is
     already covered by the new calculator-level tests).
+71. Claim now captures Institution Name and a From Date/To Date service
+    period (user direction 2026-09-24). Confirmed with the user before
+    building: From Date must fall at/after the child's 14th month (no
+    claim needed before that — first-year payout covers it); To Date
+    must fall at/before the child's 72nd month (the same six-year
+    eligibility cutoff); both are descriptive-only — they don't change
+    which EligibilityID a claim posts against (still InvoiceDate) or
+    payout allocation (still HR approval time), and the two dates are
+    explicitly allowed to span two financial years, since they're not
+    tied to any single eligibility window. Institution Name is required,
+    capped at 200 characters (no specific limit requested — used the
+    project's standard "name field" length).
+
+    Backend: `Childcare_ClaimMaster.InstitutionName/FromDate/ToDate`
+    (migration `f1a4c8d9e623`, nullable — legacy claims keep working
+    with nulls); `eligibility_calculator.is_valid_claim_from_date`/
+    `is_valid_claim_to_date` (new pure helpers, `MIN_CLAIMABLE_CHILD_
+    MONTH`/`MAX_CLAIMABLE_CHILD_MONTH` constants); `claim_service.
+    _validate_service_period` (new `InvalidServicePeriodError` → 400),
+    checked after the existing first-year-payout/eligibility checks so a
+    claim blocked for an earlier reason still gets that specific error.
+    `ClaimCreateRequest`/`ClaimUpdateRequest` also validate From Date <=
+    To Date at the schema level (no child context needed for that part).
+    Surfaced in every claim-facing schema that mirrors `ClaimResponse`:
+    `HRClaimSummary`/`HRClaimDetail` and the Claims Summary report's
+    `ClaimSummaryRow`.
+
+    Frontend: added to the Raise Claim form and the editable claim-detail
+    form (`claimSchema.ts` validates required + From<=To; the 14/72-month
+    age bounds are left to the backend's error message, not duplicated
+    client-side, since the form doesn't otherwise have easy access to
+    calculator logic); shown read-only on the employee and HR claim
+    detail views/modal; added an Institution column to the HR Claims
+    Summary report (From/To Date were left out of that already-wide
+    table but do flow through its CSV export, which dumps every field).
+
+    Caught mid-testing: `test_hr_concurrency.py` builds a claim via a
+    direct `ClaimCreateRequest(...)` call rather than a JSON payload, so
+    it was missed by the bulk fix-up of ~56 other claim-creation test
+    payloads and started failing validation — its `setup_session` was
+    then never closed on that failure (a pre-existing gap, not new),
+    leaving an orphaned open transaction on the local dev SQL Server that
+    silently blocked the next run's use of the same rows for several
+    minutes before being tracked down via `sys.dm_exec_requests`/
+    `sys.dm_exec_sessions` and killed. Fixed both: added the missing
+    fields to that test, and added `setup_session.close()` to the test's
+    cleanup `finally` so a future failure there can't leak a session
+    again.
+
+    Verified: full backend suite (178 passed, only the pre-existing
+    MinIO-dependent tests excluded), ruff/mypy clean; frontend `tsc
+    --noEmit`, `oxlint`, and `vite build` all clean. The new fields'
+    read path was also checked against real local dev data (an existing
+    pre-feature claim correctly shows `institution_name`/`from_date`/
+    `to_date` as `null` rather than breaking). The UI itself was not
+    visually exercised in a browser — no browser-automation tool was
+    available in this environment to do so.

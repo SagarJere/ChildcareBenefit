@@ -28,6 +28,9 @@ def _create_and_submit_claim(
             "invoice_date": invoice_date,
             "invoice_number": "INV-HR-1",
             "invoice_amount": "2000.00",
+            "institution_name": "Test Institution",
+            "from_date": invoice_date,
+            "to_date": invoice_date,
         },
     )
     assert created.status_code == 201, created.text
@@ -162,6 +165,9 @@ def test_hr_list_filters_by_employee_and_child_for_claim_history(
         json={
             "child_id": child_a["child_id"],
             "invoice_date": "2026-08-02",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-02",
+            "to_date": "2026-08-02",
             "invoice_number": "INV-HR-2",
             "invoice_amount": "1500.00",
         },
@@ -288,6 +294,9 @@ def test_hr_cannot_act_on_non_submitted_claim(login_as, make_hr_approver, make_e
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-DRAFT",
             "invoice_amount": "1000.00",
         },
@@ -332,6 +341,9 @@ def test_send_back_then_employee_can_resubmit(
         f"/api/v1/claims/{claim['claim_id']}",
         json={
             "invoice_date": "2026-08-02",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-02",
+            "to_date": "2026-08-02",
             "invoice_number": "INV-HR-1-CORRECTED",
             "invoice_amount": "2100.00",
         },
@@ -357,6 +369,9 @@ def test_hr_attachments_endpoints_and_isolation_from_ownership(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-HR-9",
             "invoice_amount": "1500.00",
         },

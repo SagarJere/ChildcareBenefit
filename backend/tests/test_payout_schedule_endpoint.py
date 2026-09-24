@@ -71,6 +71,9 @@ def test_payout_schedule_shows_full_ledger_including_zero_months(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-LEDGER-1",
             "invoice_amount": "9000.00",
         },

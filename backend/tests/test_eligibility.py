@@ -54,6 +54,9 @@ def test_eligibility_report_shows_utilized_in_progress_balance_and_last_modified
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-ER-1",
             "invoice_amount": "1000.00",
         },
@@ -65,6 +68,9 @@ def test_eligibility_report_shows_utilized_in_progress_balance_and_last_modified
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-01",
+            "to_date": "2026-09-01",
             "invoice_number": "INV-ER-2",
             "invoice_amount": "500.00",
         },

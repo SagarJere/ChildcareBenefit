@@ -46,6 +46,9 @@ class TestPathTraversalInUploadedFilenames:
             json={
                 "child_id": child["child_id"],
                 "invoice_date": "2026-08-01",
+                "institution_name": "Test Institution",
+                "from_date": "2026-08-01",
+                "to_date": "2026-08-01",
                 "invoice_number": "INV-SEC-1",
                 "invoice_amount": "1000.00",
             },
@@ -139,6 +142,9 @@ class TestCrossEmployeeOwnershipIsEnforced:
             json={
                 "child_id": child["child_id"],
                 "invoice_date": "2026-08-01",
+                "institution_name": "Test Institution",
+                "from_date": "2026-08-01",
+                "to_date": "2026-08-01",
                 "invoice_number": "INV-SEC-2",
                 "invoice_amount": "1000.00",
             },
@@ -226,6 +232,9 @@ class TestNPlusOneQueryRegression:
                 json={
                     "child_id": child["child_id"],
                     "invoice_date": "2026-08-01",
+                    "institution_name": "Test Institution",
+                    "from_date": "2026-08-01",
+                    "to_date": "2026-08-01",
                     "invoice_number": f"INV-SCALE-{i}",
                     "invoice_amount": "100.00",
                 },

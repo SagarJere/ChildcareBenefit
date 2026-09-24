@@ -35,6 +35,9 @@ def test_create_claim_requires_authentication(client_with_db: TestClient) -> Non
         json={
             "child_id": "00000000_1",
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-1",
             "invoice_amount": "1000.00",
         },
@@ -51,6 +54,9 @@ def test_create_claim_rejects_unknown_child(login_as) -> None:
         json={
             "child_id": "92000001_1",
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-1",
             "invoice_amount": "1000.00",
         },
@@ -70,6 +76,9 @@ def test_create_claim_fails_without_eligibility_for_invoice_period(login_as) -> 
         json={
             "child_id": child["child_id"],
             "invoice_date": "2010-01-15",
+            "institution_name": "Test Institution",
+            "from_date": "2010-01-15",
+            "to_date": "2010-01-15",
             "invoice_number": "INV-OLD",
             "invoice_amount": "1000.00",
         },
@@ -90,6 +99,9 @@ def test_create_claim_defaults_claim_amount_to_invoice_amount(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-3",
             "invoice_amount": "2500.50",
         },
@@ -119,6 +131,9 @@ def test_submit_claim_succeeds_for_month_thirteen_plus_without_documents(login_a
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-5",
             "invoice_amount": "1000.00",
         },
@@ -141,6 +156,9 @@ def test_submit_claim_succeeds_for_month_thirteen_plus_with_both_documents(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-6",
             "invoice_amount": "1000.00",
         },
@@ -176,6 +194,9 @@ def test_create_claim_rejects_duplicate_invoice_number(login_as) -> None:
     payload = {
         "child_id": child["child_id"],
         "invoice_date": "2026-08-01",
+        "institution_name": "Test Institution",
+        "from_date": "2026-08-01",
+        "to_date": "2026-08-01",
         "invoice_number": "INV-14",
         "invoice_amount": "1000.00",
     }
@@ -195,6 +216,9 @@ def test_update_claim_rejects_duplicate_invoice_number_from_another_claim(login_
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-15-A",
             "invoice_amount": "1000.00",
         },
@@ -204,6 +228,9 @@ def test_update_claim_rejects_duplicate_invoice_number_from_another_claim(login_
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-02",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-02",
+            "to_date": "2026-08-02",
             "invoice_number": "INV-15-B",
             "invoice_amount": "1200.00",
         },
@@ -213,6 +240,9 @@ def test_update_claim_rejects_duplicate_invoice_number_from_another_claim(login_
         f"/api/v1/claims/{second['claim_id']}",
         json={
             "invoice_date": "2026-08-02",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-02",
+            "to_date": "2026-08-02",
             "invoice_number": "INV-15-A",
             "invoice_amount": "1200.00",
         },
@@ -230,6 +260,9 @@ def test_update_claim_keeps_its_own_invoice_number(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-16",
             "invoice_amount": "1000.00",
         },
@@ -239,6 +272,9 @@ def test_update_claim_keeps_its_own_invoice_number(login_as) -> None:
         f"/api/v1/claims/{claim['claim_id']}",
         json={
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-16",
             "invoice_amount": "1500.00",
         },
@@ -257,6 +293,9 @@ def test_create_claim_stores_optional_comments(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-17",
             "invoice_amount": "1000.00",
             "comments": "Please process urgently.",
@@ -276,6 +315,9 @@ def test_create_claim_comments_default_to_none(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-18",
             "invoice_amount": "1000.00",
         },
@@ -298,6 +340,9 @@ def test_employee_can_view_history_and_resubmit_a_sent_back_claim(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-19",
             "invoice_amount": "1000.00",
         },
@@ -336,6 +381,9 @@ def test_employee_can_view_history_and_resubmit_a_sent_back_claim(
         f"/api/v1/claims/{claim['claim_id']}",
         json={
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-19-CORRECTED",
             "invoice_amount": "1000.00",
         },
@@ -356,6 +404,9 @@ def test_update_claim_rejected_once_submitted(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-7",
             "invoice_amount": "1000.00",
         },
@@ -366,6 +417,9 @@ def test_update_claim_rejected_once_submitted(login_as) -> None:
         f"/api/v1/claims/{claim['claim_id']}",
         json={
             "invoice_date": "2026-08-02",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-02",
+            "to_date": "2026-08-02",
             "invoice_number": "INV-7-B",
             "invoice_amount": "1200.00",
         },
@@ -382,6 +436,9 @@ def test_list_claims_returns_only_own_claims(login_as, make_employee) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-8",
             "invoice_amount": "1000.00",
         },
@@ -404,6 +461,9 @@ def test_upload_attachment_rejects_invalid_extension(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-10",
             "invoice_amount": "1000.00",
         },
@@ -427,6 +487,9 @@ def test_upload_attachment_rejects_oversized_file(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-11",
             "invoice_amount": "1000.00",
         },
@@ -452,6 +515,9 @@ def test_upload_attachment_accepts_file_just_under_the_limit(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-14",
             "invoice_amount": "1000.00",
         },
@@ -482,6 +548,9 @@ def test_upload_attachment_rejected_once_submitted(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-12",
             "invoice_amount": "1000.00",
         },
@@ -507,6 +576,9 @@ def test_upload_and_download_attachment_with_real_minio(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-13",
             "invoice_amount": "1000.00",
         },

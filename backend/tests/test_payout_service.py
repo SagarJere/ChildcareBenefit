@@ -53,6 +53,9 @@ def _create_and_submit_claim(
             "invoice_date": invoice_date,
             "invoice_number": invoice_number,
             "invoice_amount": amount,
+            "institution_name": "Test Institution",
+            "from_date": invoice_date,
+            "to_date": invoice_date,
         },
     )
     assert created.status_code == 201, created.text

@@ -49,6 +49,9 @@ def test_submitting_a_claim_increases_in_progress_amount(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-BAL-1",
             "invoice_amount": "2000.00",
         },
@@ -77,6 +80,9 @@ def test_approving_a_claim_moves_amount_from_in_progress_to_approved(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-BAL-2",
             "invoice_amount": "2000.00",
         },
@@ -118,6 +124,9 @@ def test_hr_cannot_approve_more_than_remaining_balance(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-BAL-3A",
             "invoice_amount": str(allotted),
         },
@@ -129,6 +138,9 @@ def test_hr_cannot_approve_more_than_remaining_balance(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-01",
+            "to_date": "2026-09-01",
             "invoice_number": "INV-BAL-3B",
             "invoice_amount": "500.00",
         },
@@ -166,6 +178,9 @@ def test_rejecting_a_claim_removes_it_from_in_progress(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-BAL-4",
             "invoice_amount": "1000.00",
         },
@@ -197,6 +212,9 @@ def test_send_back_removes_from_in_progress_and_resubmit_restores_it(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
             "invoice_number": "INV-BAL-5",
             "invoice_amount": "1000.00",
         },

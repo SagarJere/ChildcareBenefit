@@ -93,7 +93,15 @@ export function RaiseClaimPage() {
     formState: { errors },
   } = useForm<InvoiceDetailsFormValues>({
     resolver: zodResolver(invoiceDetailsSchema),
-    defaultValues: { invoiceDate: '', invoiceNumber: '', invoiceAmount: '', comments: '' },
+    defaultValues: {
+      invoiceDate: '',
+      invoiceNumber: '',
+      invoiceAmount: '',
+      institutionName: '',
+      fromDate: '',
+      toDate: '',
+      comments: '',
+    },
   })
 
   const createMutation = useMutation({
@@ -103,6 +111,9 @@ export function RaiseClaimPage() {
         invoice_date: values.invoiceDate,
         invoice_number: values.invoiceNumber,
         invoice_amount: values.invoiceAmount,
+        institution_name: values.institutionName,
+        from_date: values.fromDate,
+        to_date: values.toDate,
         comments: values.comments?.trim() || undefined,
       }),
     onSuccess: (created) => {
@@ -291,6 +302,66 @@ export function RaiseClaimPage() {
             </div>
 
             <div>
+              <label htmlFor="institutionName" className="block text-sm font-medium text-slate-700">
+                Institution name
+              </label>
+              <input
+                id="institutionName"
+                type="text"
+                maxLength={200}
+                className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                {...register('institutionName')}
+              />
+              {errors.institutionName && (
+                <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {errors.institutionName.message}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="fromDate" className="block text-sm font-medium text-slate-700">
+                  From date
+                </label>
+                <input
+                  id="fromDate"
+                  type="date"
+                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  {...register('fromDate')}
+                />
+                {errors.fromDate && (
+                  <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {errors.fromDate.message}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="toDate" className="block text-sm font-medium text-slate-700">
+                  To date
+                </label>
+                <input
+                  id="toDate"
+                  type="date"
+                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  {...register('toDate')}
+                />
+                {errors.toDate && (
+                  <p className="mt-1 flex items-center gap-1 text-sm text-red-600">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {errors.toDate.message}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-slate-500">
+              The service period this invoice covers — must start from the child's 14th month
+              (the first 13 months are paid automatically) and end by their 72nd month.
+            </p>
+
+            <div>
               <label htmlFor="comments" className="block text-sm font-medium text-slate-700">
                 Comments <span className="font-normal text-slate-400">(optional)</span>
               </label>
@@ -464,6 +535,13 @@ export function RaiseClaimPage() {
               <dt className="text-slate-500">Amount</dt>
               <dd className="text-right font-medium text-slate-900">
                 {formatCurrency(claim.invoice_amount)}
+              </dd>
+              <dt className="text-slate-500">Institution</dt>
+              <dd className="text-right font-medium text-slate-900">{claim.institution_name}</dd>
+              <dt className="text-slate-500">Service period</dt>
+              <dd className="text-right font-medium text-slate-900">
+                {claim.from_date && formatDate(claim.from_date)} –{' '}
+                {claim.to_date && formatDate(claim.to_date)}
               </dd>
               <dt className="text-slate-500">Documents</dt>
               <dd className="text-right font-medium text-slate-900">

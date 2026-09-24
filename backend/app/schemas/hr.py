@@ -44,6 +44,9 @@ class HRClaimSummary(BaseModel):
     invoice_number: str
     invoice_amount: Decimal
     claim_amount: Decimal
+    institution_name: str | None
+    from_date: date | None
+    to_date: date | None
     claim_status: str
     comments: str | None
     submitted_date: datetime | None
@@ -63,6 +66,9 @@ class HRClaimSummary(BaseModel):
             invoice_number=claim.InvoiceNumber,
             invoice_amount=claim.InvoiceAmount,
             claim_amount=claim.ClaimAmount,
+            institution_name=claim.InstitutionName,
+            from_date=claim.FromDate,
+            to_date=claim.ToDate,
             claim_status=claim.ClaimStatus,
             comments=claim.Comments,
             submitted_date=claim.SubmittedDate,

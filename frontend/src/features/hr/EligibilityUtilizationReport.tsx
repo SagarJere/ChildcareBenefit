@@ -83,25 +83,36 @@ export function EligibilityUtilizationReport() {
                 {formatCurrency(data.totals.total_approved_amount)}
               </div>
             </div>
+            <div>
+              <div className="text-slate-500">Total first year payout</div>
+              <div className="font-semibold text-indigo-700">
+                {formatCurrency(data.totals.total_first_year_payout_amount)}
+              </div>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
             <table className="min-w-full divide-y divide-slate-100 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
                 <tr>
+                  <th className="px-4 py-3">Employee ID</th>
                   <th className="px-4 py-3">Employee</th>
+                  <th className="px-4 py-3">Child ID</th>
                   <th className="px-4 py-3">Child</th>
                   <th className="px-4 py-3">FY</th>
                   <th className="px-4 py-3">Allotted</th>
                   <th className="px-4 py-3">In Progress</th>
                   <th className="px-4 py-3">Approved</th>
+                  <th className="px-4 py-3">First Year Payout</th>
                   <th className="px-4 py-3">Remaining*</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.rows.map((row) => (
                   <tr key={row.eligibility_id}>
+                    <td className="px-4 py-3 text-slate-600">{row.employee_id}</td>
                     <td className="px-4 py-3 text-slate-800">{row.employee_name}</td>
+                    <td className="px-4 py-3 text-slate-600">{row.child_id}</td>
                     <td className="px-4 py-3 text-slate-600">{row.child_name}</td>
                     <td className="px-4 py-3 text-slate-600">{row.financial_year}</td>
                     <td className="px-4 py-3 text-slate-600">
@@ -113,6 +124,9 @@ export function EligibilityUtilizationReport() {
                     <td className="px-4 py-3 text-emerald-700">
                       {formatCurrency(row.approved_amount)}
                     </td>
+                    <td className="px-4 py-3 text-indigo-700">
+                      {formatCurrency(row.first_year_payout_amount)}
+                    </td>
                     <td className="px-4 py-3 text-slate-600">
                       {formatCurrency(row.remaining_after_approved)}
                     </td>
@@ -120,7 +134,7 @@ export function EligibilityUtilizationReport() {
                 ))}
                 {data.rows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-slate-400">
+                    <td colSpan={10} className="px-4 py-6 text-center text-slate-400">
                       No eligibility records match these filters.
                     </td>
                   </tr>
@@ -129,8 +143,8 @@ export function EligibilityUtilizationReport() {
             </table>
           </div>
           <p className="text-xs text-slate-400">
-            *Remaining after approved claims only — does not reserve against claims still in
-            progress.
+            *Remaining after approved claims and first year payout — does not reserve against
+            claims still in progress.
           </p>
         </>
       )}

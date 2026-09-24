@@ -63,6 +63,9 @@ def create_claim(
     invoice_date: date,
     invoice_number: str,
     invoice_amount: Decimal,
+    institution_name: str,
+    from_date: date,
+    to_date: date,
     comments: str | None,
     created_by: str,
 ) -> ClaimMaster:
@@ -77,6 +80,9 @@ def create_claim(
         # See DECISIONS_LOG.md item 18: mirrors InvoiceAmount at creation —
         # the employee is not asked for a separate claim amount.
         ClaimAmount=invoice_amount,
+        InstitutionName=institution_name,
+        FromDate=from_date,
+        ToDate=to_date,
         ClaimStatus=DRAFT,
         Comments=comments,
         CreatedBy=created_by,
@@ -94,6 +100,9 @@ def update_claim(
     invoice_date: date,
     invoice_number: str,
     invoice_amount: Decimal,
+    institution_name: str,
+    from_date: date,
+    to_date: date,
     comments: str | None,
     updated_by: str,
 ) -> ClaimMaster:
@@ -102,6 +111,9 @@ def update_claim(
     claim.InvoiceNumber = invoice_number
     claim.InvoiceAmount = invoice_amount
     claim.ClaimAmount = invoice_amount
+    claim.InstitutionName = institution_name
+    claim.FromDate = from_date
+    claim.ToDate = to_date
     claim.Comments = comments
     claim.UpdatedBy = updated_by
     claim.UpdatedDate = _utc_now_naive()

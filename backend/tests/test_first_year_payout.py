@@ -133,6 +133,9 @@ def test_create_claim_blocked_within_first_thirteen_months(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-15",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-15",
+            "to_date": "2026-09-15",
             "invoice_number": "INV-FY-1",
             "invoice_amount": "1000.00",
         },
@@ -153,6 +156,9 @@ def test_create_claim_allowed_from_month_fourteen(login_as) -> None:
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-07-15",
+            "institution_name": "Test Institution",
+            "from_date": "2026-07-15",
+            "to_date": "2026-07-15",
             "invoice_number": "INV-FY-2",
             "invoice_amount": "1000.00",
         },
@@ -170,6 +176,9 @@ def test_update_claim_blocked_when_moved_into_first_year_period(login_as) -> Non
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-07-15",
+            "institution_name": "Test Institution",
+            "from_date": "2026-07-15",
+            "to_date": "2026-07-15",
             "invoice_number": "INV-FY-3",
             "invoice_amount": "1000.00",
         },
@@ -179,6 +188,9 @@ def test_update_claim_blocked_when_moved_into_first_year_period(login_as) -> Non
         f"/api/v1/claims/{claim['claim_id']}",
         json={
             "invoice_date": "2026-06-15",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-15",
+            "to_date": "2026-06-15",
             "invoice_number": "INV-FY-3",
             "invoice_amount": "1000.00",
         },
@@ -200,6 +212,9 @@ def test_create_claim_allowed_despite_young_child_when_employee_joined_late(logi
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-09-15",
+            "institution_name": "Test Institution",
+            "from_date": "2026-09-15",
+            "to_date": "2026-09-15",
             "invoice_number": "INV-FY-4",
             "invoice_amount": "1000.00",
         },
@@ -272,6 +287,9 @@ def test_hr_reports_split_first_year_and_claim_payout_for_the_same_child(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-FY-SPLIT",
             "invoice_amount": "9000.00",
         },
@@ -371,6 +389,9 @@ def test_hr_approval_cap_accounts_for_first_year_payout_already_consumed(
         json={
             "child_id": child["child_id"],
             "invoice_date": "2026-06-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-06-01",
+            "to_date": "2026-06-01",
             "invoice_number": "INV-FY-CAP",
             "invoice_amount": "160000.00",
         },
@@ -426,6 +447,9 @@ def test_hr_eligibility_utilization_report_accounts_for_first_year_payout(
     assert len(rows) == 1
     assert float(rows[0]["allotted_amount"]) == 168000.0
     assert float(rows[0]["approved_amount"]) == 0.0
+    # Shown as its own column (user-caught 2026-09-24) rather than only an
+    # invisible gap between allotted_amount and remaining_after_approved.
+    assert float(rows[0]["first_year_payout_amount"]) == 14000.0
     assert float(rows[0]["remaining_after_approved"]) == 154000.0
 
 

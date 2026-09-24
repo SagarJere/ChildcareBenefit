@@ -24,6 +24,9 @@ export interface HRClaimSummary {
   invoice_number: string
   invoice_amount: string
   claim_amount: string
+  institution_name: string | null
+  from_date: string | null
+  to_date: string | null
   claim_status: 'Draft' | 'Submitted' | 'HRReview' | 'Approved' | 'Rejected' | 'SentBack'
   comments: string | null
   submitted_date: string | null
