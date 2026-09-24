@@ -105,6 +105,20 @@ def submit_claim(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
+@router.delete("/claims/{claim_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_claim(
+    claim_id: int,
+    current_employee: EmployeeProfile = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> None:
+    try:
+        claim_service.delete_claim(db, current_employee, claim_id)
+    except ClaimNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ClaimNotEditableError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 @router.post(
     "/claims/{claim_id}/attachments",
     response_model=AttachmentResponse,

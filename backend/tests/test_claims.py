@@ -428,6 +428,117 @@ def test_update_claim_rejected_once_submitted(login_as) -> None:
     assert response.status_code == 409
 
 
+def test_delete_draft_claim_succeeds(login_as) -> None:
+    client = login_as(memp_id=920022, employee_id="92000022", Joindate=datetime(2018, 1, 1))
+    child = _add_child(client, "Kid Twenty Two", "2024-06-01")
+    claim = client.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
+            "invoice_number": "INV-22",
+            "invoice_amount": "1000.00",
+        },
+    ).json()
+
+    response = client.delete(f"/api/v1/claims/{claim['claim_id']}")
+    assert response.status_code == 204
+
+    listing = client.get("/api/v1/claims")
+    assert claim["claim_id"] not in [c["claim_id"] for c in listing.json()]
+
+    # The claim is really gone, not just hidden — re-using the exact same
+    # invoice number is now allowed again.
+    recreated = client.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
+            "invoice_number": "INV-22",
+            "invoice_amount": "2000.00",
+        },
+    )
+    assert recreated.status_code == 201, recreated.text
+
+
+def test_delete_claim_rejected_once_submitted(login_as) -> None:
+    client = login_as(memp_id=920023, employee_id="92000023", Joindate=datetime(2018, 1, 1))
+    child = _add_child(client, "Kid Twenty Three", "2024-06-01")
+    claim = client.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
+            "invoice_number": "INV-23",
+            "invoice_amount": "1000.00",
+        },
+    ).json()
+    client.post(f"/api/v1/claims/{claim['claim_id']}/submit")
+
+    response = client.delete(f"/api/v1/claims/{claim['claim_id']}")
+    assert response.status_code == 409
+
+    # Still there, untouched.
+    listing = client.get("/api/v1/claims")
+    assert claim["claim_id"] in [c["claim_id"] for c in listing.json()]
+
+
+def test_delete_claim_rejected_when_sent_back(login_as, make_employee, make_hr_approver) -> None:
+    """Deletion is deliberately Draft-only (user direction 2026-09-25) —
+    a SentBack claim should be corrected and resubmitted, not deleted,
+    even though it's otherwise editable the same way a Draft is."""
+    claimant = login_as(memp_id=920024, employee_id="92000024", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Kid Twenty Four", "2024-06-01")
+    claim = claimant.post(
+        "/api/v1/claims",
+        json={
+            "child_id": child["child_id"],
+            "invoice_date": "2026-08-01",
+            "institution_name": "Test Institution",
+            "from_date": "2026-08-01",
+            "to_date": "2026-08-01",
+            "invoice_number": "INV-24",
+            "invoice_amount": "1000.00",
+        },
+    ).json()
+    claimant.post(f"/api/v1/claims/{claim['claim_id']}/submit")
+
+    make_employee(memp_id=920026, employee_id="92000026", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("92000026")
+    hr_login = claimant.post("/api/v1/auth/login", json={"employee_id": "92000026"})
+    claimant.headers.update({"Authorization": f"Bearer {hr_login.json()['access_token']}"})
+    sent_back = claimant.post(
+        f"/api/v1/hr/claims/{claim['claim_id']}/send-back", json={"remarks": "Fix this."}
+    )
+    assert sent_back.status_code == 200
+
+    employee_login = claimant.post("/api/v1/auth/login", json={"employee_id": "92000024"})
+    claimant.headers.update({"Authorization": f"Bearer {employee_login.json()['access_token']}"})
+
+    response = claimant.delete(f"/api/v1/claims/{claim['claim_id']}")
+    assert response.status_code == 409
+
+
+def test_delete_claim_requires_authentication(client_with_db: TestClient) -> None:
+    response = client_with_db.delete("/api/v1/claims/1")
+    assert response.status_code == 401
+
+
+def test_delete_claim_rejects_unknown_claim(login_as) -> None:
+    client = login_as(memp_id=920025, employee_id="92000025", Joindate=datetime(2018, 1, 1))
+    response = client.delete("/api/v1/claims/999999999")
+    assert response.status_code == 404
+
+
 def test_list_claims_returns_only_own_claims(login_as, make_employee) -> None:
     client = login_as(memp_id=920008, employee_id="92000008", Joindate=datetime(2018, 1, 1))
     child = _add_child(client, "Kid Eight", "2024-06-01")

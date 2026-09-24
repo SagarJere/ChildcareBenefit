@@ -128,6 +128,14 @@ def mark_submitted(db: Session, claim: ClaimMaster) -> ClaimMaster:
     return claim
 
 
+def delete_claim(db: Session, claim: ClaimMaster) -> None:
+    """The caller must have already removed any rows referencing this
+    claim (attachments) — Childcare_ClaimAttachments has no ON DELETE
+    CASCADE, so this fails at the database level otherwise."""
+    db.delete(claim)
+    db.flush()
+
+
 def get_claim_by_id(db: Session, claim_id: int) -> ClaimMaster | None:
     """Unscoped lookup for HR use — HR is not restricted to a subset of
     employees' claims, only to being a recognized active HR approver

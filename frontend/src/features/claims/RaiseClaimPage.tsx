@@ -17,7 +17,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import type { AttachmentType, Claim } from '../../api/claims'
-import { createClaim, submitClaim, uploadAttachment } from '../../api/claims'
+import { createClaim, submitClaim, updateClaim, uploadAttachment } from '../../api/claims'
 import { listChildren } from '../../api/children'
 import {
   formatCurrency,
@@ -122,6 +122,36 @@ export function RaiseClaimPage() {
     },
     onError: (error) => toast.error(extractErrorMessage(error)),
   })
+
+  // Re-submitting step 2 after navigating Back to it (the draft claim
+  // already exists at that point) must update it in place, not create a
+  // second claim — a second createClaim call with the same invoice number
+  // would just fail as a duplicate.
+  const updateMutation = useMutation({
+    mutationFn: (values: InvoiceDetailsFormValues) =>
+      updateClaim(claim!.claim_id, {
+        invoice_date: values.invoiceDate,
+        invoice_number: values.invoiceNumber,
+        invoice_amount: values.invoiceAmount,
+        institution_name: values.institutionName,
+        from_date: values.fromDate,
+        to_date: values.toDate,
+        comments: values.comments?.trim() || undefined,
+      }),
+    onSuccess: (updated) => {
+      setClaim(updated)
+      setStep(3)
+    },
+    onError: (error) => toast.error(extractErrorMessage(error)),
+  })
+
+  const saveInvoiceDetails = (values: InvoiceDetailsFormValues) => {
+    if (claim) {
+      updateMutation.mutate(values)
+    } else {
+      createMutation.mutate(values)
+    }
+  }
 
   const uploadMutation = useMutation({
     mutationFn: ({ type, file }: { type: AttachmentType; file: File }) =>
@@ -237,7 +267,7 @@ export function RaiseClaimPage() {
 
         {step === 2 && (
           <form
-            onSubmit={handleSubmit((values) => createMutation.mutate(values))}
+            onSubmit={handleSubmit(saveInvoiceDetails)}
             noValidate
             className="space-y-4"
           >
@@ -390,10 +420,10 @@ export function RaiseClaimPage() {
               </button>
               <button
                 type="submit"
-                disabled={createMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending}
                 className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {createMutation.isPending && (
+                {(createMutation.isPending || updateMutation.isPending) && (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 )}
                 Next

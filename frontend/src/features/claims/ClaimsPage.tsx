@@ -1,15 +1,44 @@
-import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, FileText, Loader2, Plus } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { isAxiosError } from 'axios'
+import { AlertTriangle, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
-import { listClaims } from '../../api/claims'
+import { deleteClaim, listClaims } from '../../api/claims'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { ClaimStatusBadge } from './ClaimStatusBadge'
 
+function extractErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const backendMessage = error.response?.data?.message
+    if (typeof backendMessage === 'string') {
+      return backendMessage
+    }
+  }
+  return 'Something went wrong. Please try again.'
+}
+
 export function ClaimsPage() {
+  const queryClient = useQueryClient()
+  const [confirmingClaimId, setConfirmingClaimId] = useState<number | null>(null)
+
   const { data: claims, isPending, isError } = useQuery({
     queryKey: ['claims'],
     queryFn: listClaims,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (claimId: number) => deleteClaim(claimId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['claims'] })
+      toast.success('Claim deleted.')
+      setConfirmingClaimId(null)
+    },
+    onError: (error) => {
+      toast.error(extractErrorMessage(error))
+      setConfirmingClaimId(null)
+    },
   })
 
   return (
@@ -72,6 +101,8 @@ export function ClaimsPage() {
             <tbody className="divide-y divide-slate-100">
               {claims.map((claim) => {
                 const isEditable = claim.claim_status === 'Draft' || claim.claim_status === 'SentBack'
+                const isDraft = claim.claim_status === 'Draft'
+                const isConfirming = confirmingClaimId === claim.claim_id
                 return (
                   <tr key={claim.claim_id}>
                     <td className="px-4 py-3 font-medium text-slate-900">{claim.child_name}</td>
@@ -83,13 +114,51 @@ export function ClaimsPage() {
                     <td className="px-4 py-3">
                       <ClaimStatusBadge status={claim.claim_status} />
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        to={`/claims/${claim.claim_id}`}
-                        className="font-medium text-indigo-700 hover:underline"
-                      >
-                        {isEditable ? 'Continue' : 'View'}
-                      </Link>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-3">
+                        {isConfirming ? (
+                          <>
+                            <span className="text-xs text-slate-500">Delete this claim?</span>
+                            <button
+                              type="button"
+                              disabled={deleteMutation.isPending}
+                              onClick={() => deleteMutation.mutate(claim.claim_id)}
+                              className="flex items-center gap-1 font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {deleteMutation.isPending && (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                              )}
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingClaimId(null)}
+                              className="font-medium text-slate-500 hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {isDraft && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmingClaimId(claim.claim_id)}
+                                className="flex items-center gap-1 font-medium text-slate-400 hover:text-red-600"
+                                aria-label="Delete claim"
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            )}
+                            <Link
+                              to={`/claims/${claim.claim_id}`}
+                              className="font-medium text-indigo-700 hover:underline"
+                            >
+                              {isEditable ? 'Continue' : 'View'}
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

@@ -90,6 +90,10 @@ export async function submitClaim(claimId: number): Promise<Claim> {
   return data
 }
 
+export async function deleteClaim(claimId: number): Promise<void> {
+  await apiClient.delete(`/claims/${claimId}`)
+}
+
 export async function uploadAttachment(
   claimId: number,
   attachmentType: AttachmentType,

@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.claim_attachment import ClaimAttachment
@@ -24,6 +24,13 @@ def get_attachment_for_claim(
             ClaimAttachment.ClaimID == claim_id, ClaimAttachment.AttachmentID == attachment_id
         )
     ).scalar_one_or_none()
+
+
+def delete_for_claim(db: Session, claim_id: int) -> None:
+    """The underlying MinIO objects are deliberately left in place — a
+    harmless orphan, same tolerance already applied elsewhere in this
+    module when a DB write fails after a successful upload."""
+    db.execute(delete(ClaimAttachment).where(ClaimAttachment.ClaimID == claim_id))
 
 
 def create_attachment(

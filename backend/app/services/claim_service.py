@@ -274,6 +274,24 @@ def submit_claim(db: Session, employee: EmployeeProfile, claim_id: int) -> Claim
     return _to_response(db, claim)
 
 
+def delete_claim(db: Session, employee: EmployeeProfile, claim_id: int) -> None:
+    """Only a Draft claim can be deleted (user direction 2026-09-25) — a
+    SentBack claim should be corrected and resubmitted instead, matching
+    how it's already treated everywhere else (_EDITABLE_STATUSES covers
+    both for editing, but deletion is Draft-only). No balance resync is
+    needed: Draft claims never count toward InProgressAmount (only
+    Submitted does — see report_repository.
+    get_in_progress_totals_by_eligibility), so nothing they've never
+    touched needs recomputing."""
+    claim = claim_repository.get_claim_for_employee(db, employee.memp_id, claim_id)
+    if claim is None:
+        raise ClaimNotFoundError(f"No claim {claim_id} found for this employee.")
+    if claim.ClaimStatus != DRAFT:
+        raise ClaimNotEditableError("Only a Draft claim can be deleted.")
+    claim_attachment_repository.delete_for_claim(db, claim.ClaimID)
+    claim_repository.delete_claim(db, claim)
+
+
 def upload_attachment(
     db: Session,
     employee: EmployeeProfile,

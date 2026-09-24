@@ -7,6 +7,7 @@ import {
   FileCheck2,
   Loader2,
   Send,
+  Trash2,
   Upload,
 } from 'lucide-react'
 import { Fragment, useState } from 'react'
@@ -15,7 +16,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import type { AttachmentType } from '../../api/claims'
-import { getClaim, submitClaim, updateClaim, uploadAttachment } from '../../api/claims'
+import { deleteClaim, getClaim, submitClaim, updateClaim, uploadAttachment } from '../../api/claims'
 import { ApprovalHistoryTimeline } from '../../components/ApprovalHistoryTimeline'
 import { formatCurrency, formatDate, formatMonthYear } from '../../lib/format'
 import { ClaimStatusBadge } from './ClaimStatusBadge'
@@ -40,6 +41,7 @@ export function ClaimDetailPage() {
   const numericClaimId = Number(claimId)
 
   const [uploadingType, setUploadingType] = useState<AttachmentType | null>(null)
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
 
   const claimQuery = useQuery({
     queryKey: ['claim', numericClaimId],
@@ -90,6 +92,19 @@ export function ClaimDetailPage() {
       navigate('/claims')
     },
     onError: (error) => toast.error(extractErrorMessage(error)),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteClaim(numericClaimId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['claims'] })
+      toast.success('Claim deleted.')
+      navigate('/claims')
+    },
+    onError: (error) => {
+      toast.error(extractErrorMessage(error))
+      setIsConfirmingDelete(false)
+    },
   })
 
   if (claimQuery.isPending) {
@@ -249,7 +264,42 @@ export function ClaimDetailPage() {
       )}
 
       {isEditable && (
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <div>
+            {claim.claim_status === 'Draft' &&
+              (isConfirmingDelete ? (
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-slate-500">Delete this claim?</span>
+                  <button
+                    type="button"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => deleteMutation.mutate()}
+                    className="flex items-center gap-1 font-medium text-red-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {deleteMutation.isPending && (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    )}
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsConfirmingDelete(false)}
+                    className="font-medium text-slate-500 hover:underline"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Delete Claim
+                </button>
+              ))}
+          </div>
           <button
             type="button"
             disabled={submitMutation.isPending}

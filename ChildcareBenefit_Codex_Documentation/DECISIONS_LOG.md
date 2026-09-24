@@ -1047,3 +1047,43 @@
     `to_date` as `null` rather than breaking). The UI itself was not
     visually exercised in a browser — no browser-automation tool was
     available in this environment to do so.
+72. Raise Claim double-submit bug + Draft claim deletion (user-reported
+    2026-09-25). Bug: step 2 of Raise Claim ("Invoice details") always
+    called `createClaim` on submit, even when the user had already
+    created the draft claim, gone back to step 2, and clicked Next again
+    unchanged — the second `createClaim` call then hit the duplicate-
+    invoice-number check and failed with a confusing "already exists"
+    error, even though nothing was actually wrong. Fixed by tracking
+    whether a claim has already been created in this flow (`claim` state
+    already existed for this purpose) and calling `updateClaim` instead
+    of `createClaim` once it has — the same claim gets corrected in
+    place rather than a duplicate being attempted.
+
+    New feature: a Draft claim can now be deleted (deliberately Draft-
+    only, not SentBack — a SentBack claim should be corrected and
+    resubmitted instead, per the existing flow). Backend: `DELETE /api/
+    v1/claims/{claim_id}`, scoped to the owning employee and to
+    `ClaimStatus == Draft`, deletes the claim's `Childcare_
+    ClaimAttachments` rows first (no `ON DELETE CASCADE` on that FK) then
+    the claim itself; the underlying MinIO objects are deliberately left
+    as harmless orphans, same tolerance already applied elsewhere for a
+    failed-write-after-upload. No balance resync needed — Draft claims
+    never count toward `InProgressAmount` (only `Submitted` does), so
+    nothing that's ever touched a balance is being removed. Frontend:
+    both the My Claims list (per-row) and the Claim Detail page get a
+    Delete action, each with an inline two-click confirm (no native
+    `confirm()` dialog — matches the rest of the app's own rendered-
+    confirmation pattern, e.g. HR's reject/send-back flow).
+
+    Verified with the project's standard revert/restore methodology for
+    the deletion feature's core cases: `test_delete_draft_claim_succeeds`
+    (also proves the invoice number is truly freed up, not just hidden),
+    `test_delete_claim_rejected_once_submitted`,
+    `test_delete_claim_rejected_when_sent_back`, plus auth/ownership
+    tests. Full backend suite: 183 passed (only pre-existing MinIO-
+    dependent tests excluded), ruff/mypy clean; frontend `vite build`
+    and `oxlint` clean. Not covered: an attachment-cleanup test (delete
+    succeeding when the claim has uploaded documents) — would need a
+    live MinIO instance, which isn't running in this environment; the
+    deletion order (attachments row delete before claim delete) was
+    verified by code review instead.
