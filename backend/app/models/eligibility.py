@@ -37,6 +37,15 @@ class EligibilityMaster(Base):
     ApprovedAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2), default=0)
     InProgressAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2), default=0)
     RemainingAmount: Mapped[Decimal] = mapped_column(DECIMAL(18, 2))
+    # The date this eligibility record was actually created — used only
+    # to anchor first-year-payout catch-up bundling (see
+    # payout_calculator._first_year_payout_by_month); null on eligibility
+    # rows that predate that feature (2026-09-24), which is treated as
+    # "no catch-up" (each first-year month stands alone, the original
+    # behavior). Deliberately separate from CreatedDate (a DATETIME server
+    # default) so the calculator gets a plain, stable date to compare
+    # against months.
+    FirstYearPayoutAsOfDate: Mapped[date | None] = mapped_column(Date, nullable=True)
     IsActive: Mapped[bool] = mapped_column(default=True)
     CreatedDate: Mapped[datetime] = mapped_column(DateTime, server_default=func.getutcdate())
     UpdatedDate: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

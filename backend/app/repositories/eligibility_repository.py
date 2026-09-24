@@ -25,6 +25,7 @@ def create_eligibility(
     child_dob: date,
     financial_year_id: int,
     calculation: EligibilityCalculation,
+    first_year_payout_as_of_date: date,
 ) -> EligibilityMaster:
     eligibility = EligibilityMaster(
         MEmpID=memp_id,
@@ -43,6 +44,7 @@ def create_eligibility(
         ApprovedAmount=0,
         InProgressAmount=0,
         RemainingAmount=calculation.allotted_amount,
+        FirstYearPayoutAsOfDate=first_year_payout_as_of_date,
         IsActive=True,
     )
     db.add(eligibility)

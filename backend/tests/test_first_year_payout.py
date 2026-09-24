@@ -75,7 +75,13 @@ def test_add_child_splits_first_year_payout_across_two_financial_years(
     # Month 1 = Apr 2026, month 13 = Apr 2027, month 14 = May 2027 — so
     # the current FY (Apr 2026-Mar 2027) is entirely first-year, and the
     # next FY (Apr 2027-Mar 2028) has exactly one first-year month
-    # (April) before turning claimable.
+    # (April) before turning claimable. The child is added well after
+    # April ("today" in this environment), so the catch-up rule (user
+    # direction 2026-09-24) bundles every missed month's payout into the
+    # month it's actually added — checked here as an aggregate total
+    # rather than per-row, since exactly which row gets the bundle
+    # depends on "today"; the exact bundling math has its own dedicated
+    # coverage in test_payout_calculator.py's TestFirstYearPayoutCatchUp.
     client = login_as(memp_id=910002, employee_id="91000002", Joindate=datetime(2018, 1, 1))
     child = _add_child(client, "First Year Kid Two", "2026-04-01")
 
@@ -85,7 +91,8 @@ def test_add_child_splits_first_year_payout_across_two_financial_years(
         db_session, current_eligibility_id
     )
     assert len(current_ledger) == 12
-    assert all(float(row.FirstYearPayoutAmount) == 14000.0 for row in current_ledger)
+    total_first_year_payout = sum(float(row.FirstYearPayoutAmount) for row in current_ledger)
+    assert total_first_year_payout == 12 * 14000.0
     assert all(float(row.ClaimAllocatedAmount) == 0.0 for row in current_ledger)
 
     next_fy = f"{int(current_fy[:4]) + 1}-{str(int(current_fy[:4]) + 2)[-2:]}"

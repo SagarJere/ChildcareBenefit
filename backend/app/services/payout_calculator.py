@@ -87,25 +87,70 @@ class PayoutCapacityExceededError(Exception):
     """
 
 
+def _first_year_payout_by_month(
+    first_year_months: list[date], first_year_payout_as_of_date: date
+) -> dict[date, Decimal]:
+    """Bundles every first-year month up through the one containing
+    `first_year_payout_as_of_date` — the date this eligibility record was
+    actually created — into that single month's payout, and leaves every
+    later first-year month untouched at its own standalone entitlement.
+
+    None of the months before the record existed could have been
+    physically disbursed on their own, so they're rolled into the month
+    the child was actually added instead of being paid (or silently
+    dropped) individually — user direction 2026-09-24: child DOB Aug
+    2026, added in Sep 2026, should show Sep = 14k (its own) + 14k
+    (Aug's catch-up), with October onward unaffected.
+
+    When `first_year_payout_as_of_date` falls at or before the window's
+    first month (the normal case — a child added the same month it's
+    born, or a next-financial-year window created well before it starts),
+    the loop below never advances past index 0 and this reduces to the
+    original one-month-at-a-time behavior.
+    """
+    if not first_year_months:
+        return {}
+
+    as_of_month = _month_start(first_year_payout_as_of_date)
+    catchup_index = 0
+    for index, month in enumerate(first_year_months):
+        if month <= as_of_month:
+            catchup_index = index
+        else:
+            break
+
+    amounts: dict[date, Decimal] = {}
+    for index, month in enumerate(first_year_months):
+        if index < catchup_index:
+            amounts[month] = Decimal("0")
+        elif index == catchup_index:
+            amounts[month] = MONTHLY_BENEFIT_AMOUNT * (catchup_index + 1)
+        else:
+            amounts[month] = MONTHLY_BENEFIT_AMOUNT
+    return amounts
+
+
 def calculate_payout_schedule(
     *,
     child_dob: date,
     eligibility_start_date: date,
     eligibility_end_date: date,
+    first_year_payout_as_of_date: date,
     approved_claims: list[ApprovedClaimInput],
 ) -> PayoutScheduleResult:
     """Computes the monthly payout ledger and per-claim allocation for one
     child's one financial year of eligibility.
 
     The child's first 13 months of life (user direction 2026-09-22) are
-    paid automatically — each such month's full entitlement goes to
-    `first_year_payout_amount`, with no claim involved and no carry-
-    forward interaction with the claim-driven months that follow. Since
-    child age only increases with calendar time, these first-year months
-    are always a prefix of this eligibility window's months (never
-    interleaved with claimable ones), so the claim-driven pointer/
-    carry-forward mechanics below run unmodified, just scoped to the
-    remaining "claimable" months.
+    paid automatically, with no claim involved and no carry-forward
+    interaction with the claim-driven months that follow — see
+    `_first_year_payout_by_month` for how `first_year_payout_as_of_date`
+    (added 2026-09-24) bundles any first-year months missed before the
+    child was actually added into the month it was added. Since child age
+    only increases with calendar time, these first-year months are always
+    a prefix of this eligibility window's months (never interleaved with
+    claimable ones), so the claim-driven pointer/carry-forward mechanics
+    below run unmodified, just scoped to the remaining "claimable" months.
 
     Claims are processed in chronological order of `approved_at`
     (PAYOUT_REQUIREMENTS.md §5). Each claim first "catches up" — consuming
@@ -116,10 +161,14 @@ def calculate_payout_schedule(
     one at a time (§4), each such future month getting its own row.
     """
     months = eligible_months_between(eligibility_start_date, eligibility_end_date)
-    first_year_months = {
+    first_year_months_set = {
         month for month in months if is_first_year_payout_month(child_dob=child_dob, month=month)
     }
-    claimable_months = [month for month in months if month not in first_year_months]
+    first_year_months = [month for month in months if month in first_year_months_set]
+    claimable_months = [month for month in months if month not in first_year_months_set]
+    first_year_payout_by_month = _first_year_payout_by_month(
+        first_year_months, first_year_payout_as_of_date
+    )
 
     # Tracks each origin month's remaining *physical* capacity, purely to
     # know how much can still be drawn from it — not what gets displayed
@@ -206,14 +255,15 @@ def calculate_payout_schedule(
     ledger = []
     opening = Decimal("0")
     for month in months:
-        if month in first_year_months:
+        if month in first_year_months_set:
+            first_year_payout = first_year_payout_by_month[month]
             ledger.append(
                 MonthlyLedgerEntry(
                     month=month,
                     entitlement_amount=MONTHLY_BENEFIT_AMOUNT,
                     opening_balance=Decimal("0"),
-                    total_available_amount=MONTHLY_BENEFIT_AMOUNT,
-                    first_year_payout_amount=MONTHLY_BENEFIT_AMOUNT,
+                    total_available_amount=first_year_payout,
+                    first_year_payout_amount=first_year_payout,
                     claim_allocated_amount=Decimal("0"),
                     carry_forward_amount=Decimal("0"),
                 )

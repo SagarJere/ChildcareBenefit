@@ -140,6 +140,7 @@ def add_child(
             "record, or another request for this employee is still being processed — "
             "please check My Children before trying again."
         ) from exc
+    added_date = date.today()
     eligibility = eligibility_repository.create_eligibility(
         db,
         memp_id=employee.memp_id,
@@ -149,6 +150,7 @@ def add_child(
         child_dob=child_dob,
         financial_year_id=financial_year_row.FinancialYearID,
         calculation=calculation,
+        first_year_payout_as_of_date=added_date,
     )
     # Populates the payout ledger immediately when this window includes
     # any first-year-payout months — with no claims yet, this naturally
@@ -186,6 +188,7 @@ def add_child(
             child_dob=child_dob,
             financial_year_id=next_financial_year_row.FinancialYearID,
             calculation=next_calculation,
+            first_year_payout_as_of_date=added_date,
         )
         if _has_first_year_payout(next_calculation, child_dob):
             payout_service.recalculate_payout(db, next_eligibility.EligibilityID)

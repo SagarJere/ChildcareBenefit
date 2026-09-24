@@ -25,6 +25,7 @@ class TestNoClaims:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 4, 1),
+            first_year_payout_as_of_date=date(2026, 4, 1),
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[],
         )
@@ -42,6 +43,7 @@ class TestSingleClaimWithinOneMonth:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
@@ -66,6 +68,7 @@ class TestFutureMonthAllocation:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
@@ -100,6 +103,7 @@ class TestFullBusinessExampleFromSpec:
         return calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
@@ -178,12 +182,14 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
         result_a = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=out_of_order,
         )
         result_b = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=in_order,
         )
@@ -196,6 +202,7 @@ class TestEligibilityBoundary:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2027, 1, 1),
+            first_year_payout_as_of_date=date(2027, 1, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
@@ -218,6 +225,7 @@ class TestEligibilityBoundary:
             calculate_payout_schedule(
                 child_dob=date(2015, 1, 1),
                 eligibility_start_date=date(2027, 1, 1),
+                first_year_payout_as_of_date=date(2027, 1, 1),
                 eligibility_end_date=date(2027, 3, 31),
                 approved_claims=[
                     ApprovedClaimInput(
@@ -232,6 +240,7 @@ class TestEligibilityBoundary:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 6, 1),
+            first_year_payout_as_of_date=date(2026, 6, 1),
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[
                 ApprovedClaimInput(
@@ -253,6 +262,7 @@ class TestFirstYearPayout:
         result = calculate_payout_schedule(
             child_dob=date(2026, 1, 1),
             eligibility_start_date=date(2026, 1, 1),
+            first_year_payout_as_of_date=date(2026, 1, 1),
             eligibility_end_date=date(2027, 1, 31),
             approved_claims=[],
         )
@@ -272,6 +282,7 @@ class TestFirstYearPayout:
         result = calculate_payout_schedule(
             child_dob=date(2025, 7, 1),
             eligibility_start_date=date(2026, 5, 1),
+            first_year_payout_as_of_date=date(2026, 5, 1),
             eligibility_end_date=date(2026, 10, 31),
             approved_claims=[
                 ApprovedClaimInput(
@@ -305,10 +316,112 @@ class TestFirstYearPayout:
         result = calculate_payout_schedule(
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[],
         )
         assert all(entry.first_year_payout_amount == 0 for entry in result.ledger)
+
+
+class TestFirstYearPayoutCatchUp:
+    """User direction 2026-09-24: a child born in one month but only added
+    to the system in a later month should have every first-year month
+    missed in between bundled into the month it was actually added —
+    "if Child DOB in Aug 26 and we added the details in Sep 26 then Sep
+    26 should have 14k + 14k and rest remains as it is"."""
+
+    def test_child_added_one_month_after_birth_bundles_into_added_month(self) -> None:
+        result = calculate_payout_schedule(
+            child_dob=date(2026, 8, 1),
+            eligibility_start_date=date(2026, 8, 1),
+            first_year_payout_as_of_date=date(2026, 9, 15),
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[],
+        )
+        by_month = {entry.month: entry for entry in result.ledger}
+
+        assert by_month[date(2026, 8, 1)].first_year_payout_amount == 0
+        assert by_month[date(2026, 9, 1)].first_year_payout_amount == 28000
+        for month in (date(2026, 10, 1), date(2026, 11, 1), date(2026, 12, 1)):
+            assert by_month[month].first_year_payout_amount == 14000
+        assert by_month[date(2027, 1, 1)].first_year_payout_amount == 14000
+        assert by_month[date(2027, 2, 1)].first_year_payout_amount == 14000
+        assert by_month[date(2027, 3, 1)].first_year_payout_amount == 14000
+
+    def test_child_added_several_months_after_birth_bundles_every_missed_month(self) -> None:
+        # Month 1 = Jan 2026, added in Sep 2026 (month 9) — Jan through
+        # Sep (9 months) are all bundled into September's own row.
+        result = calculate_payout_schedule(
+            child_dob=date(2026, 1, 1),
+            eligibility_start_date=date(2026, 1, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            eligibility_end_date=date(2027, 1, 31),
+            approved_claims=[],
+        )
+        by_month = {entry.month: entry for entry in result.ledger}
+
+        for month in (
+            date(2026, 1, 1),
+            date(2026, 2, 1),
+            date(2026, 3, 1),
+            date(2026, 4, 1),
+            date(2026, 5, 1),
+            date(2026, 6, 1),
+            date(2026, 7, 1),
+            date(2026, 8, 1),
+        ):
+            assert by_month[month].first_year_payout_amount == 0
+        assert by_month[date(2026, 9, 1)].first_year_payout_amount == 126000  # 9 * 14000
+        # Month 13 (Jan 2027) is the last first-year month — still its own
+        # standalone entitlement, untouched by the earlier catch-up.
+        assert by_month[date(2027, 1, 1)].first_year_payout_amount == 14000
+
+        total_first_year_payout = sum(
+            entry.first_year_payout_amount for entry in result.ledger
+        )
+        assert total_first_year_payout == 13 * 14000
+
+    def test_child_added_before_window_starts_has_no_catchup(self) -> None:
+        # Mirrors the next-financial-year eligibility record, created at
+        # the same time as the current-FY one but well before its own
+        # window starts — nothing was ever missed, so no bundling.
+        result = calculate_payout_schedule(
+            child_dob=date(2026, 8, 1),
+            eligibility_start_date=date(2027, 4, 1),
+            first_year_payout_as_of_date=date(2026, 9, 15),
+            eligibility_end_date=date(2027, 8, 31),
+            approved_claims=[],
+        )
+        assert all(entry.first_year_payout_amount == 14000 for entry in result.ledger)
+
+    def test_catchup_does_not_affect_claim_driven_months_that_follow(self) -> None:
+        # Same shape as test_window_spanning_the_first_year_boundary_
+        # splits_cleanly, but the child is added a month late (Jun 2026
+        # instead of May) — only the first-year months are bundled; the
+        # claimable months' carry-forward mechanics are untouched.
+        result = calculate_payout_schedule(
+            child_dob=date(2025, 7, 1),
+            eligibility_start_date=date(2026, 5, 1),
+            first_year_payout_as_of_date=date(2026, 6, 1),
+            eligibility_end_date=date(2026, 10, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 8, 15)
+                )
+            ],
+        )
+        by_month = {entry.month: entry for entry in result.ledger}
+
+        assert by_month[date(2026, 5, 1)].first_year_payout_amount == 0
+        assert by_month[date(2026, 6, 1)].first_year_payout_amount == 28000
+        assert by_month[date(2026, 7, 1)].first_year_payout_amount == 14000
+
+        august = by_month[date(2026, 8, 1)]
+        assert august.first_year_payout_amount == 0
+        assert august.opening_balance == 0
+        assert august.claim_allocated_amount == 9000
+        assert august.carry_forward_amount == 5000
+        assert result.allocations == [_alloc(1, date(2026, 8, 1), 9000, 1)]
 
 
 def _alloc(claim_id: int, month: date, amount: int, sequence: int):

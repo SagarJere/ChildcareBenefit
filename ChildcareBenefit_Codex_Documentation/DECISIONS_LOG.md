@@ -942,3 +942,51 @@
     and `test_employee_eligibility_report_accounts_for_first_year_payout`.
     No production data repair needed — production had just been fully
     wiped (item 68) with no children added since.
+70. First-year payout catch-up on late add-child (user direction
+    2026-09-24): "payout should start from the month in which we added
+    the Child details, the previous month carry-fwd logic should apply
+    here as well... if Child DOB in Aug 26 and we added the details in
+    Sep 26 then Sep 26 should have 14k + 14k and rest remains as it is."
+    Previously every first-year month got its own standalone 14,000 row
+    regardless of when the child was actually entered into the system —
+    a child added several months after birth would show payout amounts
+    against months before the record even existed, which doesn't match
+    any real disbursement.
+
+    `payout_calculator.calculate_payout_schedule` gained a required
+    `first_year_payout_as_of_date` parameter and a new
+    `_first_year_payout_by_month` helper: every first-year month up to
+    and including the one containing that date is bundled into that one
+    month's `first_year_payout_amount` (earlier ones become 0); every
+    first-year month after it is untouched at its own standalone 14,000.
+    This is the same "catch-up" shape as the claim-driven pointer
+    mechanic just above it in the same function, but anchored to one
+    fixed event (the record's creation) instead of a list of claim
+    approvals, so it always resolves to exactly one bundling point.
+
+    The as-of date has to be a stored fact, not `date.today()` re-read on
+    every `recalculate_payout` call (which happens again on later claim
+    approvals for the same eligibility) — otherwise the bundling point
+    would silently drift forward each time. Added
+    `Childcare_EligibilityMaster.FirstYearPayoutAsOfDate` (nullable —
+    existing rows fall back to `EligibilityStartDate`, i.e. no catch-up,
+    preserving their original behavior), set once to `date.today()` in
+    `child_service.add_child` for both the current- and next-FY
+    eligibility records it creates. Using the same value for both is
+    deliberately uniform rather than special-cased: for the current-FY
+    record the add date normally falls inside the window (triggering
+    catch-up), while for the next-FY record it normally falls *before*
+    the window even starts, which the same bundling formula naturally
+    resolves to "no catch-up" — by the time next year's window opens,
+    the record has existed for a full financial year already, so nothing
+    was ever missed.
+
+    Verified with the project's standard revert/restore methodology.
+    New coverage: `test_payout_calculator.py`'s
+    `TestFirstYearPayoutCatchUp` (pure calculator math — one month late,
+    several months late, added before the window starts, and that
+    claim-driven months are unaffected). One existing integration test,
+    `test_add_child_splits_first_year_payout_across_two_financial_years`,
+    had its per-row assertion loosened to an aggregate total, since which
+    row receives the bundle now depends on "today" (the exact math is
+    already covered by the new calculator-level tests).

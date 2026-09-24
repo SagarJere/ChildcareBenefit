@@ -24,10 +24,17 @@ def recalculate_payout(db: Session, eligibility_id: int) -> None:
 
     approved_claims = payout_repository.get_approved_claims_with_approval_time(db, eligibility_id)
 
+    # Falls back to the window's own start date (i.e. no catch-up — each
+    # first-year month stands alone) for eligibility rows created before
+    # FirstYearPayoutAsOfDate existed (2026-09-24).
+    first_year_payout_as_of_date = (
+        eligibility.FirstYearPayoutAsOfDate or eligibility.EligibilityStartDate
+    )
     result = payout_calculator.calculate_payout_schedule(
         child_dob=eligibility.ChildDOB,
         eligibility_start_date=eligibility.EligibilityStartDate,
         eligibility_end_date=eligibility.EligibilityEndDate,
+        first_year_payout_as_of_date=first_year_payout_as_of_date,
         approved_claims=approved_claims,
     )
 
