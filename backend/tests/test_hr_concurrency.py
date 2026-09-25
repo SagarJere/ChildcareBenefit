@@ -25,6 +25,7 @@ from app.models.claim_approval_history import ClaimApprovalHistory
 from app.models.eligibility import EligibilityMaster
 from app.models.employee import MasterEmpBasicInfo
 from app.models.payout import PayoutAllocation, PayoutMonthlyLedger
+from app.repositories import payout_settings_repository
 from app.schemas.claim import ClaimCreateRequest
 from app.schemas.employee import EmployeeProfile
 from app.schemas.hr import ApproveRequest
@@ -46,6 +47,20 @@ def test_concurrent_approve_processes_the_claim_only_once(monkeypatch: pytest.Mo
 
     setup_session = Session(bind=engine)
     try:
+        # Childcare_PayoutSettings is a genuine application-wide
+        # singleton this test's real (non-rolled-back) session can see —
+        # reset it to safe defaults before create_claim/submit_claim
+        # below, the same guard client_with_db applies for every other
+        # test (see its own comment) but this one bypasses since it
+        # needs real connections for row-locking, not that fixture.
+        settings = payout_settings_repository.get_settings(setup_session)
+        settings.SubmissionCutoffDay = 5
+        settings.ClaimsBlocked = False
+        settings.OpenFinancialYearID = None
+        settings.OpenFinancialYear = None
+        settings.ForceSameMonthPayout = False
+        setup_session.flush()
+
         setup_session.add(
             MasterEmpBasicInfo(
                 MEmpID=memp_id,

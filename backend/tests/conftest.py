@@ -68,6 +68,7 @@ def client_with_db(db_session: Session) -> TestClient:
     from app.core.config import get_settings
     from app.database.session import get_db
     from app.main import create_app
+    from app.repositories import payout_settings_repository
 
     get_settings.cache_clear()
     app = create_app()
@@ -76,6 +77,31 @@ def client_with_db(db_session: Session) -> TestClient:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_get_db
+
+    # Childcare_PayoutSettings is a genuine application-wide singleton,
+    # not scoped to any one test's data — a rolled-back test transaction
+    # still sees already-committed rows from other connections (e.g. a
+    # developer manually toggling "Pause all claims" via the real HR
+    # Settings page), which would otherwise silently 403 every claim-
+    # creating test in the whole suite. Reset to safe defaults here,
+    # within this test's own transaction, so a real-world change can
+    # never again break the test suite (see DECISIONS_LOG.md's
+    # payout-settings follow-up, 2026-09-25) — any test that specifically
+    # cares about a different cutoff day or a blocked state still sets
+    # that explicitly itself.
+    settings = payout_settings_repository.get_settings(db_session)
+    settings.SubmissionCutoffDay = 5
+    settings.ClaimsBlocked = False
+    # Same singleton-leak guard, extended for the financial-year gate and
+    # same-month-payout override added 2026-09-25 (same day) — a real HR
+    # "open next FY" click, or the override being left on, would
+    # otherwise leak in exactly like SubmissionCutoffDay/ClaimsBlocked
+    # used to.
+    settings.OpenFinancialYearID = None
+    settings.OpenFinancialYear = None
+    settings.ForceSameMonthPayout = False
+    db_session.flush()
+
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

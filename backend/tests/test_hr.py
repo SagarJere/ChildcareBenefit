@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models.claim import ClaimMaster
 from app.models.claim_attachment import PAYMENT_PROOF, RECEIPT_INVOICE, ClaimAttachment
 
 
@@ -102,12 +103,29 @@ def test_hr_can_list_and_view_submitted_claim(
     assert body["approval_history"] == []
 
 
-def test_hr_list_filters_by_invoice_date_range(login_as, make_hr_approver, make_employee) -> None:
+def test_hr_list_filters_by_submitted_date_range(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """User direction 2026-09-25: the approval queue's date filter is
+    Submitted from/to, not invoice date (that's still the Claims Summary
+    Report's own, separate filter). Both claims here are actually
+    submitted "now" within milliseconds of each other, so SubmittedDate
+    is backdated directly — the same "insert synthetic precondition rows"
+    pattern used elsewhere for date-sensitive tests — to give the filter
+    something genuinely different to distinguish."""
     claimant = login_as(memp_id=930020, employee_id="93000020", Joindate=datetime(2018, 1, 1))
     child_a = _add_child(claimant, "Kid HR Date A", "2024-06-01")
     child_b = _add_child(claimant, "Kid HR Date B", "2024-07-01")
     early_claim = _create_and_submit_claim(claimant, child_a["child_id"], invoice_date="2026-06-01")
     late_claim = _create_and_submit_claim(claimant, child_b["child_id"], invoice_date="2026-09-01")
+
+    db_session.query(ClaimMaster).filter(ClaimMaster.ClaimID == early_claim["claim_id"]).update(
+        {ClaimMaster.SubmittedDate: datetime(2026, 6, 15)}
+    )
+    db_session.query(ClaimMaster).filter(ClaimMaster.ClaimID == late_claim["claim_id"]).update(
+        {ClaimMaster.SubmittedDate: datetime(2026, 9, 15)}
+    )
+    db_session.flush()
 
     make_employee(memp_id=930021, employee_id="93000021", Joindate=datetime(2018, 1, 1))
     make_hr_approver("93000021")
@@ -115,12 +133,42 @@ def test_hr_list_filters_by_invoice_date_range(login_as, make_hr_approver, make_
     hr_client = claimant
 
     filtered = hr_client.get(
-        "/api/v1/hr/claims", params={"date_from": "2026-08-01", "date_to": "2026-09-30"}
+        "/api/v1/hr/claims",
+        params={"submitted_date_from": "2026-08-01", "submitted_date_to": "2026-09-30"},
     )
     assert filtered.status_code == 200
     filtered_ids = {c["claim_id"] for c in filtered.json()}
     assert late_claim["claim_id"] in filtered_ids
     assert early_claim["claim_id"] not in filtered_ids
+
+
+def test_hr_list_submitted_date_to_is_inclusive_of_the_whole_day(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """SubmittedDate is a DATETIME, not a DATE — a naive comparison
+    against a bare "to" date would exclude anything submitted later
+    that same day (midnight only). Confirms a claim backdated to the
+    evening of the "to" date is still included."""
+    claimant = login_as(memp_id=930022, employee_id="93000022", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Kid HR Date C", "2024-06-01")
+    claim = _create_and_submit_claim(claimant, child["child_id"])
+
+    db_session.query(ClaimMaster).filter(ClaimMaster.ClaimID == claim["claim_id"]).update(
+        {ClaimMaster.SubmittedDate: datetime(2026, 9, 30, 23, 45)}
+    )
+    db_session.flush()
+
+    make_employee(memp_id=930023, employee_id="93000023", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("93000023")
+    _login_as_existing(claimant, "93000023")
+    hr_client = claimant
+
+    filtered = hr_client.get(
+        "/api/v1/hr/claims",
+        params={"submitted_date_from": "2026-09-01", "submitted_date_to": "2026-09-30"},
+    )
+    assert filtered.status_code == 200
+    assert claim["claim_id"] in {c["claim_id"] for c in filtered.json()}
 
 
 def test_hr_list_filters_by_status(login_as, make_hr_approver, make_employee) -> None:

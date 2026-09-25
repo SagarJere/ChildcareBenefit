@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   FileCheck2,
   Loader2,
+  Pause,
   Upload,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -19,6 +20,7 @@ import { toast } from 'sonner'
 import type { AttachmentType, Claim } from '../../api/claims'
 import { createClaim, submitClaim, updateClaim, uploadAttachment } from '../../api/claims'
 import { listChildren } from '../../api/children'
+import { getPayoutSettings } from '../../api/payoutSettings'
 import {
   formatCurrency,
   formatDate,
@@ -86,6 +88,12 @@ export function RaiseClaimPage() {
 
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: listChildren })
   const selectedChild = childrenQuery.data?.find((c) => c.child_id === selectedChildId) ?? null
+
+  const { data: payoutSettings } = useQuery({
+    queryKey: ['payout-settings'],
+    queryFn: getPayoutSettings,
+  })
+  const claimsBlocked = payoutSettings?.claims_blocked ?? false
 
   const {
     register,
@@ -186,6 +194,16 @@ export function RaiseClaimPage() {
         <h1 className="text-2xl font-semibold text-slate-900">Raise Claim</h1>
         <StepIndicator step={step} />
       </div>
+
+      {claimsBlocked && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Pause className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          HR has temporarily paused new claims.{' '}
+          {claim
+            ? "You can still upload documents, but this claim can't be submitted until claims are resumed."
+            : "You can't create a new claim right now."}
+        </div>
+      )}
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         {step === 1 && (
@@ -420,7 +438,9 @@ export function RaiseClaimPage() {
               </button>
               <button
                 type="submit"
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={
+                  (claimsBlocked && !claim) || createMutation.isPending || updateMutation.isPending
+                }
                 className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {(createMutation.isPending || updateMutation.isPending) && (
@@ -597,7 +617,7 @@ export function RaiseClaimPage() {
               </button>
               <button
                 type="button"
-                disabled={submitMutation.isPending}
+                disabled={claimsBlocked || submitMutation.isPending}
                 onClick={() => submitMutation.mutate()}
                 className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
               >

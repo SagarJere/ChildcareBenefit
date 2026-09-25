@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { AlertTriangle, FileText, Loader2, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, FileText, Loader2, Pause, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { deleteClaim, listClaims } from '../../api/claims'
+import { getPayoutSettings } from '../../api/payoutSettings'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { ClaimStatusBadge } from './ClaimStatusBadge'
 
@@ -28,6 +29,12 @@ export function ClaimsPage() {
     queryFn: listClaims,
   })
 
+  const { data: payoutSettings } = useQuery({
+    queryKey: ['payout-settings'],
+    queryFn: getPayoutSettings,
+  })
+  const claimsBlocked = payoutSettings?.claims_blocked ?? false
+
   const deleteMutation = useMutation({
     mutationFn: (claimId: number) => deleteClaim(claimId),
     onSuccess: async () => {
@@ -48,14 +55,29 @@ export function ClaimsPage() {
           <h1 className="text-2xl font-semibold text-slate-900">My Claims</h1>
           <p className="mt-1 text-slate-600">Raise and track childcare benefit claims.</p>
         </div>
-        <Link
-          to="/claims/new"
-          className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Raise Claim
-        </Link>
+        {claimsBlocked ? (
+          <span className="flex items-center gap-1.5 rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400">
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Raise Claim
+          </span>
+        ) : (
+          <Link
+            to="/claims/new"
+            className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Raise Claim
+          </Link>
+        )}
       </div>
+
+      {claimsBlocked && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Pause className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          HR has temporarily paused new claims. You can't create or submit a claim right now, but
+          existing Drafts can still be edited.
+        </div>
+      )}
 
       {isPending && (
         <div className="flex items-center gap-2 text-slate-600">
@@ -75,13 +97,15 @@ export function ClaimsPage() {
         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
           <FileText className="h-8 w-8 text-slate-300" aria-hidden="true" />
           <p className="text-slate-600">You haven't raised any claims yet.</p>
-          <Link
-            to="/claims/new"
-            className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Raise your first claim
-          </Link>
+          {!claimsBlocked && (
+            <Link
+              to="/claims/new"
+              className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Raise your first claim
+            </Link>
+          )}
         </div>
       )}
 

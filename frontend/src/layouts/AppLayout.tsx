@@ -42,6 +42,9 @@ export function AppLayout() {
                 <NavLink to="/hr/reports" className={navLinkClasses}>
                   Reports
                 </NavLink>
+                <NavLink to="/hr/settings" className={navLinkClasses}>
+                  Settings
+                </NavLink>
               </>
             )}
           </nav>
@@ -85,6 +88,9 @@ export function AppLayout() {
               </NavLink>
               <NavLink to="/hr/reports" className={navLinkClasses}>
                 Reports
+              </NavLink>
+              <NavLink to="/hr/settings" className={navLinkClasses}>
+                Settings
               </NavLink>
             </>
           )}

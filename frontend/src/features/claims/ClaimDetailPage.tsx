@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   FileCheck2,
   Loader2,
+  Pause,
   Send,
   Trash2,
   Upload,
@@ -17,6 +18,7 @@ import { toast } from 'sonner'
 
 import type { AttachmentType } from '../../api/claims'
 import { deleteClaim, getClaim, submitClaim, updateClaim, uploadAttachment } from '../../api/claims'
+import { getPayoutSettings } from '../../api/payoutSettings'
 import { ApprovalHistoryTimeline } from '../../components/ApprovalHistoryTimeline'
 import { formatCurrency, formatDate, formatMonthYear } from '../../lib/format'
 import { ClaimStatusBadge } from './ClaimStatusBadge'
@@ -47,6 +49,12 @@ export function ClaimDetailPage() {
     queryKey: ['claim', numericClaimId],
     queryFn: () => getClaim(numericClaimId),
   })
+
+  const { data: payoutSettings } = useQuery({
+    queryKey: ['payout-settings'],
+    queryFn: getPayoutSettings,
+  })
+  const claimsBlocked = payoutSettings?.claims_blocked ?? false
 
   const invalidate = () =>
     Promise.all([
@@ -145,6 +153,14 @@ export function ClaimDetailPage() {
         </div>
         <ClaimStatusBadge status={claim.claim_status} />
       </div>
+
+      {isEditable && claimsBlocked && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Pause className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          HR has temporarily paused new claims. You can still edit this claim, but it can't be
+          submitted until claims are resumed.
+        </div>
+      )}
 
       {claim.claim_status === 'SentBack' && latestSentBack && (
         <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
@@ -302,7 +318,7 @@ export function ClaimDetailPage() {
           </div>
           <button
             type="button"
-            disabled={submitMutation.isPending}
+            disabled={claimsBlocked || submitMutation.isPending}
             onClick={() => submitMutation.mutate()}
             className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
           >

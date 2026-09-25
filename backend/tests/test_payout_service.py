@@ -9,22 +9,31 @@ focus on the database wiring: full-rebuild across multiple approvals,
 and that rejecting/sending back a claim does not create payout rows.
 
 Payout allocation is anchored to the HR *approval* timestamp, not the
-claim's invoice date (PAYOUT_REQUIREMENTS.md §5) — so to exercise
-cross-month spillover deterministically, the multi-claim test below
-directly backdates Childcare_ClaimApprovalHistory.ActionDate (the same
-"insert synthetic precondition rows directly" pattern test_claims.py
-already uses for attachments) and re-triggers the recompute, since three
-real approvals made seconds apart in a test run would otherwise all land
-in the same real calendar month.
+claim's invoice date (PAYOUT_REQUIREMENTS.md §5), and — as of user
+direction 2026-09-25 — the submission's own cutoff-adjusted month, if
+that's later (see payout_calculator._effective_processing_month), unless
+HR's ForceSameMonthPayout override is on (same day's follow-up feature),
+in which case the cutoff-adjusted month is ignored entirely. So to
+exercise cross-month spillover deterministically, the multi-claim test
+below directly backdates both Childcare_ClaimApprovalHistory.ActionDate
+and Childcare_ClaimMaster.SubmittedDate (the same "insert synthetic
+precondition rows directly" pattern test_claims.py already uses for
+attachments) and re-triggers the recompute, since three real submissions
+and approvals made seconds apart in a test run would otherwise all land
+in the same real calendar month (and, without also backdating
+SubmittedDate, today's real submission date would push every claim's
+effective month later than intended once the cutoff day applies).
 
 Run against the real SQL Server configured for this environment, inside a
 transaction that is always rolled back — see conftest.py.
 """
+
 from datetime import date, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.models.claim import ClaimMaster
 from app.models.claim_approval_history import APPROVED as HISTORY_APPROVED
 from app.models.claim_approval_history import ClaimApprovalHistory
 from app.repositories import payout_repository
@@ -109,6 +118,144 @@ def test_approving_a_single_claim_persists_ledger_and_allocation(
     assert float(anchor_row.ClosingBalance) == float(anchor_row.TotalAvailableAmount) - 9000.00
 
 
+def test_payout_settings_cutoff_day_actually_wired_through_recalculate(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """End-to-end (settings -> claim submission snapshot -> payout_service
+    -> payout_repository -> payout_calculator), not just the pure
+    calculator math already covered by test_payout_calculator.py's
+    TestSubmissionCutoffDay. "Today" is 2026-09-25 — past the *default*
+    cutoff day (5, see conftest's client_with_db reset), which would
+    otherwise push this claim to October regardless of whether this test
+    ever touched the settings endpoint at all. HR raises the cutoff to 28
+    *before* the claim is submitted; since the cutoff day that applies to
+    a claim is the one snapshotted onto it at the moment it's actually
+    submitted (ClaimMaster.SubmissionCutoffDayAtSubmission — user-
+    reported bug 2026-09-25, changing the setting must never retroactively
+    move an already-submitted claim), the claim should land in September
+    instead, proving the setting genuinely reaches the calculation and
+    isn't just coincidentally matching the default."""
+    make_employee(memp_id=970006, employee_id="97000006", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("97000006")
+
+    claimant = login_as(memp_id=970005, employee_id="97000005", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Payout Kid Three", "2024-06-01")
+    eligibility_id = child["eligibility"]["eligibility_id"]
+
+    _login_as_existing(claimant, "97000006")
+    settings = claimant.put(
+        "/api/v1/hr/payout-settings",
+        json={
+            "submission_cutoff_day": 28,
+            "claims_blocked": False,
+            "force_same_month_payout": False,
+        },
+    )
+    assert settings.status_code == 200
+
+    _login_as_existing(claimant, "97000005")
+    claim = _create_and_submit_claim(
+        claimant,
+        child["child_id"],
+        invoice_date="2026-06-01",
+        invoice_number="INV-PO-CUTOFF",
+        amount="9000.00",
+    )
+
+    _login_as_existing(claimant, "97000006")
+    approve = claimant.post(
+        f"/api/v1/hr/claims/{claim['claim_id']}/approve", json={"approved_amount": "9000.00"}
+    )
+    assert approve.status_code == 200
+
+    ledger = payout_repository.get_ledger_for_eligibility(db_session, eligibility_id)
+    ledger_by_month = {row.PayoutMonth: row for row in ledger}
+    assert float(ledger_by_month[date(2026, 9, 1)].ClaimAllocatedAmount) == 9000.00
+    assert float(ledger_by_month[date(2026, 10, 1)].ClaimAllocatedAmount) == 0.0
+
+
+def test_changing_cutoff_day_after_submission_does_not_move_an_approved_claim(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """End-to-end regression for the exact bug the user reported
+    2026-09-25: a claim submitted+approved while the cutoff day was
+    generous (28) correctly lands in September; HR then lowers the
+    cutoff to 20 and a second claim is submitted+approved — the *first*
+    claim's month must not shift just because the setting changed and a
+    later approval triggered a fresh full-rebuild recompute for the same
+    eligibility."""
+    make_employee(memp_id=970009, employee_id="97000009", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("97000009")
+
+    claimant = login_as(memp_id=970010, employee_id="97000010", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Payout Kid Five", "2024-06-01")
+    eligibility_id = child["eligibility"]["eligibility_id"]
+
+    _login_as_existing(claimant, "97000009")
+    first_settings = claimant.put(
+        "/api/v1/hr/payout-settings",
+        json={
+            "submission_cutoff_day": 28,
+            "claims_blocked": False,
+            "force_same_month_payout": False,
+        },
+    )
+    assert first_settings.status_code == 200
+
+    _login_as_existing(claimant, "97000010")
+    claim_a = _create_and_submit_claim(
+        claimant,
+        child["child_id"],
+        invoice_date="2026-06-01",
+        invoice_number="INV-PO-CUTOFF-A",
+        amount="10000.00",
+    )
+
+    _login_as_existing(claimant, "97000009")
+    approve_a = claimant.post(
+        f"/api/v1/hr/claims/{claim_a['claim_id']}/approve", json={"approved_amount": "10000.00"}
+    )
+    assert approve_a.status_code == 200
+
+    ledger_after_a = payout_repository.get_ledger_for_eligibility(db_session, eligibility_id)
+    by_month_after_a = {row.PayoutMonth: row for row in ledger_after_a}
+    assert float(by_month_after_a[date(2026, 9, 1)].ClaimAllocatedAmount) == 10000.00
+
+    second_settings = claimant.put(
+        "/api/v1/hr/payout-settings",
+        json={
+            "submission_cutoff_day": 20,
+            "claims_blocked": False,
+            "force_same_month_payout": False,
+        },
+    )
+    assert second_settings.status_code == 200
+
+    _login_as_existing(claimant, "97000010")
+    claim_b = _create_and_submit_claim(
+        claimant,
+        child["child_id"],
+        invoice_date="2026-06-02",
+        invoice_number="INV-PO-CUTOFF-B",
+        amount="5000.00",
+    )
+
+    _login_as_existing(claimant, "97000009")
+    approve_b = claimant.post(
+        f"/api/v1/hr/claims/{claim_b['claim_id']}/approve", json={"approved_amount": "5000.00"}
+    )
+    assert approve_b.status_code == 200
+
+    ledger_after_b = payout_repository.get_ledger_for_eligibility(db_session, eligibility_id)
+    by_month_after_b = {row.PayoutMonth: row for row in ledger_after_b}
+    # Claim A stays in September — the cutoff day it was actually
+    # submitted under (28) is frozen on the claim itself, not re-derived
+    # from whatever the setting has since changed to.
+    assert float(by_month_after_b[date(2026, 9, 1)].ClaimAllocatedAmount) == 10000.00
+    # Claim B correctly lands in October under the new, stricter cutoff.
+    assert float(by_month_after_b[date(2026, 10, 1)].ClaimAllocatedAmount) == 5000.00
+
+
 def test_full_worked_example_persists_correctly_across_multiple_approvals(
     login_as, make_hr_approver, make_employee, db_session: Session
 ) -> None:
@@ -167,7 +314,11 @@ def test_full_worked_example_persists_correctly_across_multiple_approvals(
     # Backdate each claim's Approved history entry to the spec's own
     # worked-example timeline, then re-run the recompute so the ledger
     # reflects that timeline instead of the real (near-identical) approval
-    # timestamps from the loop above.
+    # timestamps from the loop above. SubmittedDate is backdated to the
+    # 1st of that same month, so its cutoff-adjusted month never lands
+    # later than the approval month and this test stays purely about
+    # approval-time-driven allocation, unrelated to the cutoff-day
+    # feature (which has its own dedicated tests).
     backdated_approval_times = {
         claim_a["claim_id"]: datetime(2026, 9, 10),
         claim_b["claim_id"]: datetime(2026, 11, 20),
@@ -178,6 +329,9 @@ def test_full_worked_example_persists_correctly_across_multiple_approvals(
             ClaimApprovalHistory.ClaimID == claim_id,
             ClaimApprovalHistory.Action == HISTORY_APPROVED,
         ).update({ClaimApprovalHistory.ActionDate: approved_at})
+        db_session.query(ClaimMaster).filter(ClaimMaster.ClaimID == claim_id).update(
+            {ClaimMaster.SubmittedDate: datetime(approved_at.year, approved_at.month, 1)}
+        )
     db_session.flush()
     payout_service.recalculate_payout(db_session, eligibility_id)
 
@@ -299,3 +453,72 @@ def test_rejecting_a_claim_creates_no_payout_rows(
 
     assert payout_repository.get_ledger_for_eligibility(db_session, eligibility_id) == []
     assert payout_repository.get_allocations_for_eligibility(db_session, eligibility_id) == []
+
+
+def test_force_same_month_payout_is_read_live_and_sweeps_an_already_approved_claim(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """The deliberate opposite of the cutoff-day snapshot fix (item 76):
+    ForceSameMonthPayout is read live on every recompute, not fixed at
+    submission time. A claim submitted after the cutoff day defers to
+    next month as usual; HR then turns the override on (for FY close-
+    out) and triggers a fresh recompute — the already-approved claim
+    must be swept into its approval month immediately, not stay pinned
+    to where the cutoff rule originally put it. That's the whole point:
+    HR wants everything currently in flight cleared out, not just
+    claims submitted from then on (user direction 2026-09-25)."""
+    make_employee(memp_id=970012, employee_id="97000012", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("97000012")
+
+    claimant = login_as(memp_id=970011, employee_id="97000011", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Payout Kid Seven", "2024-06-01")
+    eligibility_id = child["eligibility"]["eligibility_id"]
+
+    _login_as_existing(claimant, "97000012")
+    baseline = claimant.put(
+        "/api/v1/hr/payout-settings",
+        json={
+            "submission_cutoff_day": 5,
+            "claims_blocked": False,
+            "force_same_month_payout": False,
+        },
+    )
+    assert baseline.status_code == 200
+
+    _login_as_existing(claimant, "97000011")
+    claim = _create_and_submit_claim(
+        claimant,
+        child["child_id"],
+        invoice_date="2026-06-01",
+        invoice_number="INV-FORCE-SAME-MONTH",
+        amount="9000.00",
+    )
+
+    _login_as_existing(claimant, "97000012")
+    approve = claimant.post(
+        f"/api/v1/hr/claims/{claim['claim_id']}/approve", json={"approved_amount": "9000.00"}
+    )
+    assert approve.status_code == 200
+
+    # "Today" is 2026-09-25, after the default cutoff day (5), so this
+    # claim defers to October despite being approved in September.
+    ledger_before = payout_repository.get_ledger_for_eligibility(db_session, eligibility_id)
+    by_month_before = {row.PayoutMonth: row for row in ledger_before}
+    assert float(by_month_before[date(2026, 9, 1)].ClaimAllocatedAmount) == 0.0
+    assert float(by_month_before[date(2026, 10, 1)].ClaimAllocatedAmount) == 9000.00
+
+    turn_on = claimant.put(
+        "/api/v1/hr/payout-settings",
+        json={"submission_cutoff_day": 5, "claims_blocked": False, "force_same_month_payout": True},
+    )
+    assert turn_on.status_code == 200
+
+    # In practice a later claim's own approval would trigger this full
+    # rebuild; called directly here to isolate the override's effect
+    # from needing a second claim.
+    payout_service.recalculate_payout(db_session, eligibility_id)
+
+    ledger_after = payout_repository.get_ledger_for_eligibility(db_session, eligibility_id)
+    by_month_after = {row.PayoutMonth: row for row in ledger_after}
+    assert float(by_month_after[date(2026, 9, 1)].ClaimAllocatedAmount) == 9000.00
+    assert float(by_month_after[date(2026, 10, 1)].ClaimAllocatedAmount) == 0.0

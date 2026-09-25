@@ -12,6 +12,7 @@ import { EligibilityReportPage } from '../features/eligibility/EligibilityReport
 import { PayoutScheduleDetailPage } from '../features/eligibility/PayoutScheduleDetailPage'
 import { HRClaimDetailPage } from '../features/hr/HRClaimDetailPage'
 import { HRClaimsPage } from '../features/hr/HRClaimsPage'
+import { HRSettingsPage } from '../features/hr/HRSettingsPage'
 import { ReportsPage } from '../features/hr/ReportsPage'
 import { MyPayoutPage } from '../features/payout/MyPayoutPage'
 import { AppLayout } from '../layouts/AppLayout'
@@ -36,6 +37,7 @@ export function AppRoutes() {
             <Route path="/hr/claims" element={<HRClaimsPage />} />
             <Route path="/hr/claims/:claimId" element={<HRClaimDetailPage />} />
             <Route path="/hr/reports" element={<ReportsPage />} />
+            <Route path="/hr/settings" element={<HRSettingsPage />} />
           </Route>
         </Route>
       </Route>

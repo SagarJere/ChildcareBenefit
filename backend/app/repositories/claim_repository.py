@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -121,9 +121,12 @@ def update_claim(
     return claim
 
 
-def mark_submitted(db: Session, claim: ClaimMaster) -> ClaimMaster:
+def mark_submitted(db: Session, claim: ClaimMaster, *, submission_cutoff_day: int) -> ClaimMaster:
     claim.ClaimStatus = SUBMITTED
     claim.SubmittedDate = _utc_now_naive()
+    # Snapshotted, not re-read at payout-calculation time — see
+    # ClaimMaster.SubmissionCutoffDayAtSubmission.
+    claim.SubmissionCutoffDayAtSubmission = submission_cutoff_day
     db.flush()
     return claim
 
@@ -173,9 +176,14 @@ def get_claims_for_hr(
     *,
     employee_id: str | None = None,
     child_id: str | None = None,
-    date_from: date | None = None,
-    date_to: date | None = None,
+    submitted_date_from: date | None = None,
+    submitted_date_to: date | None = None,
 ) -> list[ClaimMaster]:
+    """Filters by SubmittedDate, not InvoiceDate (user direction
+    2026-09-25) — a claim never submitted (SubmittedDate NULL) is
+    naturally excluded once either bound is given, which is correct:
+    HR's approval queue only cares about claims that have actually
+    entered the review pipeline."""
     stmt = select(ClaimMaster)
     if status is not None:
         stmt = stmt.where(ClaimMaster.ClaimStatus == status)
@@ -183,10 +191,13 @@ def get_claims_for_hr(
         stmt = stmt.where(ClaimMaster.EmployeeID == employee_id)
     if child_id is not None:
         stmt = stmt.where(ClaimMaster.ChildID == child_id)
-    if date_from is not None:
-        stmt = stmt.where(ClaimMaster.InvoiceDate >= date_from)
-    if date_to is not None:
-        stmt = stmt.where(ClaimMaster.InvoiceDate <= date_to)
+    if submitted_date_from is not None:
+        stmt = stmt.where(ClaimMaster.SubmittedDate >= submitted_date_from)
+    if submitted_date_to is not None:
+        # SubmittedDate is a DATETIME, not DATE — add a day and use a
+        # strict "<" bound so a claim submitted any time on the "to" date
+        # itself is included, not just ones submitted at exactly midnight.
+        stmt = stmt.where(ClaimMaster.SubmittedDate < submitted_date_to + timedelta(days=1))
     return list(db.execute(stmt.order_by(ClaimMaster.CreatedDate.desc())).scalars().all())
 
 

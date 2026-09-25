@@ -50,12 +50,19 @@ def get_approved_claims_with_approval_time(
     Childcare_ClaimApprovalHistory (not ClaimMaster.ClaimAmount), since
     HR may approve a different amount than what was claimed, and a claim
     is approved at most once in this application (see
-    report_repository.get_approved_totals_by_eligibility)."""
+    report_repository.get_approved_totals_by_eligibility). Also carries
+    ClaimMaster.SubmittedDate and SubmissionCutoffDayAtSubmission (the
+    latest submission if the claim was ever sent back and resubmitted —
+    both columns are overwritten together on resubmission, not
+    append-only) for the cutoff-day payout-month calculation (user
+    direction 2026-09-25)."""
     rows = db.execute(
         select(
             ClaimApprovalHistory.ClaimID,
             ClaimApprovalHistory.ApprovedAmount,
             ClaimApprovalHistory.ActionDate,
+            ClaimMaster.SubmittedDate,
+            ClaimMaster.SubmissionCutoffDayAtSubmission,
         )
         .join(ClaimMaster, ClaimMaster.ClaimID == ClaimApprovalHistory.ClaimID)
         .where(
@@ -66,9 +73,18 @@ def get_approved_claims_with_approval_time(
     ).all()
     return [
         ApprovedClaimInput(
-            claim_id=claim_id, approved_amount=approved_amount, approved_at=action_date
+            claim_id=claim_id,
+            approved_amount=approved_amount,
+            approved_at=action_date,
+            # SubmittedDate/SubmissionCutoffDayAtSubmission are only ever
+            # null for a claim that was never submitted, which can't be
+            # true of an Approved one — see claim_service.submit_claim,
+            # the only path to Submitted (and the only writer of either
+            # column).
+            submitted_date=submitted_date.date(),
+            submission_cutoff_day=submission_cutoff_day,
         )
-        for claim_id, approved_amount, action_date in rows
+        for claim_id, approved_amount, action_date, submitted_date, submission_cutoff_day in rows
     ]
 
 

@@ -32,8 +32,8 @@ def list_claims(
     status_filter: str | None = Query(default=None, alias="status"),
     employee_id: str | None = None,
     child_id: str | None = None,
-    date_from: date | None = None,
-    date_to: date | None = None,
+    submitted_date_from: date | None = None,
+    submitted_date_to: date | None = None,
     current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
     db: Session = Depends(get_db),
 ) -> list[HRClaimSummary]:
@@ -42,8 +42,8 @@ def list_claims(
         status_filter,
         employee_id=employee_id,
         child_id=child_id,
-        date_from=date_from,
-        date_to=date_to,
+        submitted_date_from=submitted_date_from,
+        submitted_date_to=submitted_date_to,
     )
 
 

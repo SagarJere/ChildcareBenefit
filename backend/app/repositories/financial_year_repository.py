@@ -6,6 +6,10 @@ from app.models.financial_year import FinancialYearMaster
 from app.services.eligibility_calculator import FinancialYearWindow
 
 
+def get_by_id(db: Session, financial_year_id: int) -> FinancialYearMaster | None:
+    return db.get(FinancialYearMaster, financial_year_id)
+
+
 def list_all(db: Session) -> list[FinancialYearMaster]:
     """Every financial year that has ever been touched (rows are
     get-or-created lazily — see get_or_create), most recent first. Feeds

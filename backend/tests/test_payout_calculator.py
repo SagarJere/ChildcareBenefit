@@ -26,6 +26,7 @@ class TestNoClaims:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 4, 1),
             first_year_payout_as_of_date=date(2026, 4, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[],
         )
@@ -44,10 +45,15 @@ class TestSingleClaimWithinOneMonth:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 9, 15)
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 15),
+                    submitted_date=date(2026, 9, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -69,10 +75,15 @@ class TestFutureMonthAllocation:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("50000"), approved_at=datetime(2026, 11, 20)
+                    claim_id=1,
+                    approved_amount=Decimal("50000"),
+                    approved_at=datetime(2026, 11, 20),
+                    submitted_date=date(2026, 11, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -104,16 +115,29 @@ class TestFullBusinessExampleFromSpec:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 9, 10)
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 10),
+                    submitted_date=date(2026, 9, 1),
+                    submission_cutoff_day=5,
                 ),
                 ApprovedClaimInput(
-                    claim_id=2, approved_amount=Decimal("50000"), approved_at=datetime(2026, 11, 20)
+                    claim_id=2,
+                    approved_amount=Decimal("50000"),
+                    approved_at=datetime(2026, 11, 20),
+                    submitted_date=date(2026, 11, 1),
+                    submission_cutoff_day=5,
                 ),
                 ApprovedClaimInput(
-                    claim_id=3, approved_amount=Decimal("15000"), approved_at=datetime(2027, 1, 10)
+                    claim_id=3,
+                    approved_amount=Decimal("15000"),
+                    approved_at=datetime(2027, 1, 10),
+                    submitted_date=date(2027, 1, 1),
+                    submission_cutoff_day=5,
                 ),
             ],
         )
@@ -171,10 +195,18 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
     def test_claims_are_sorted_internally(self) -> None:
         out_of_order = [
             ApprovedClaimInput(
-                claim_id=2, approved_amount=Decimal("50000"), approved_at=datetime(2026, 11, 20)
+                claim_id=2,
+                approved_amount=Decimal("50000"),
+                approved_at=datetime(2026, 11, 20),
+                submitted_date=date(2026, 11, 1),
+                submission_cutoff_day=5,
             ),
             ApprovedClaimInput(
-                claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 9, 10)
+                claim_id=1,
+                approved_amount=Decimal("9000"),
+                approved_at=datetime(2026, 9, 10),
+                submitted_date=date(2026, 9, 1),
+                submission_cutoff_day=5,
             ),
         ]
         in_order = list(reversed(out_of_order))
@@ -183,6 +215,7 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=out_of_order,
         )
@@ -190,6 +223,7 @@ class TestChronologicalOrderingIsByApprovalTimeNotInputOrder:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=in_order,
         )
@@ -203,10 +237,15 @@ class TestEligibilityBoundary:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2027, 1, 1),
             first_year_payout_as_of_date=date(2027, 1, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("42000"), approved_at=datetime(2027, 1, 5)
+                    claim_id=1,
+                    approved_amount=Decimal("42000"),
+                    approved_at=datetime(2027, 1, 5),
+                    submitted_date=date(2027, 1, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -226,12 +265,15 @@ class TestEligibilityBoundary:
                 child_dob=date(2015, 1, 1),
                 eligibility_start_date=date(2027, 1, 1),
                 first_year_payout_as_of_date=date(2027, 1, 1),
+                force_same_month_payout=False,
                 eligibility_end_date=date(2027, 3, 31),
                 approved_claims=[
                     ApprovedClaimInput(
                         claim_id=1,
                         approved_amount=Decimal("42000.01"),
                         approved_at=datetime(2027, 1, 5),
+                        submitted_date=date(2027, 1, 1),
+                        submission_cutoff_day=5,
                     )
                 ],
             )
@@ -241,10 +283,15 @@ class TestEligibilityBoundary:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 6, 1),
             first_year_payout_as_of_date=date(2026, 6, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2026, 6, 30),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("14000"), approved_at=datetime(2026, 6, 10)
+                    claim_id=1,
+                    approved_amount=Decimal("14000"),
+                    approved_at=datetime(2026, 6, 10),
+                    submitted_date=date(2026, 6, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -263,6 +310,7 @@ class TestFirstYearPayout:
             child_dob=date(2026, 1, 1),
             eligibility_start_date=date(2026, 1, 1),
             first_year_payout_as_of_date=date(2026, 1, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 1, 31),
             approved_claims=[],
         )
@@ -283,10 +331,15 @@ class TestFirstYearPayout:
             child_dob=date(2025, 7, 1),
             eligibility_start_date=date(2026, 5, 1),
             first_year_payout_as_of_date=date(2026, 5, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2026, 10, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 8, 15)
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 8, 15),
+                    submitted_date=date(2026, 8, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -317,6 +370,7 @@ class TestFirstYearPayout:
             child_dob=date(2015, 1, 1),
             eligibility_start_date=date(2026, 9, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[],
         )
@@ -335,6 +389,7 @@ class TestFirstYearPayoutCatchUp:
             child_dob=date(2026, 8, 1),
             eligibility_start_date=date(2026, 8, 1),
             first_year_payout_as_of_date=date(2026, 9, 15),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 3, 31),
             approved_claims=[],
         )
@@ -355,6 +410,7 @@ class TestFirstYearPayoutCatchUp:
             child_dob=date(2026, 1, 1),
             eligibility_start_date=date(2026, 1, 1),
             first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 1, 31),
             approved_claims=[],
         )
@@ -376,9 +432,7 @@ class TestFirstYearPayoutCatchUp:
         # standalone entitlement, untouched by the earlier catch-up.
         assert by_month[date(2027, 1, 1)].first_year_payout_amount == 14000
 
-        total_first_year_payout = sum(
-            entry.first_year_payout_amount for entry in result.ledger
-        )
+        total_first_year_payout = sum(entry.first_year_payout_amount for entry in result.ledger)
         assert total_first_year_payout == 13 * 14000
 
     def test_child_added_before_window_starts_has_no_catchup(self) -> None:
@@ -389,6 +443,7 @@ class TestFirstYearPayoutCatchUp:
             child_dob=date(2026, 8, 1),
             eligibility_start_date=date(2027, 4, 1),
             first_year_payout_as_of_date=date(2026, 9, 15),
+            force_same_month_payout=False,
             eligibility_end_date=date(2027, 8, 31),
             approved_claims=[],
         )
@@ -403,10 +458,15 @@ class TestFirstYearPayoutCatchUp:
             child_dob=date(2025, 7, 1),
             eligibility_start_date=date(2026, 5, 1),
             first_year_payout_as_of_date=date(2026, 6, 1),
+            force_same_month_payout=False,
             eligibility_end_date=date(2026, 10, 31),
             approved_claims=[
                 ApprovedClaimInput(
-                    claim_id=1, approved_amount=Decimal("9000"), approved_at=datetime(2026, 8, 15)
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 8, 15),
+                    submitted_date=date(2026, 8, 1),
+                    submission_cutoff_day=5,
                 )
             ],
         )
@@ -422,6 +482,307 @@ class TestFirstYearPayoutCatchUp:
         assert august.claim_allocated_amount == 9000
         assert august.carry_forward_amount == 5000
         assert result.allocations == [_alloc(1, date(2026, 8, 1), 9000, 1)]
+
+
+class TestSubmissionCutoffDay:
+    """User direction 2026-09-25: a claim submitted on or before the
+    cutoff day is eligible for that same month's payout; submitted
+    later, payout is pushed to the next month even if HR approves it
+    just as quickly."""
+
+    def test_submitted_before_cutoff_and_approved_same_month_pays_same_month(self) -> None:
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 3),
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 9, 1), 9000, 1)]
+
+    def test_submitted_after_cutoff_and_approved_same_month_pays_next_month(self) -> None:
+        """The exact scenario the user described: late submission still
+        loses the same-month payout even though HR approved it that
+        same month."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 10),
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 10, 1), 9000, 1)]
+
+    def test_slow_approval_overrides_an_early_submission(self) -> None:
+        """Submitted before the cutoff (would-be effective month:
+        September), but HR doesn't approve until November — payout
+        can't move before it's actually approved, so it lands in
+        November, not September."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 11, 15),
+                    submitted_date=date(2026, 9, 3),
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 11, 1), 9000, 1)]
+
+    def test_cutoff_day_is_actually_configurable(self) -> None:
+        """A claim submitted on day 15 is before a cutoff of 20, but
+        after a cutoff of 5 — same submission, different outcome purely
+        from the cutoff day that was configured (and snapshotted onto
+        the claim — see ApprovedClaimInput.submission_cutoff_day) when
+        it was submitted."""
+        shared_kwargs = dict(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+        )
+        with_generous_cutoff = calculate_payout_schedule(
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 25),
+                    submitted_date=date(2026, 9, 15),
+                    submission_cutoff_day=20,
+                )
+            ],
+            **shared_kwargs,
+        )
+        assert with_generous_cutoff.allocations == [_alloc(1, date(2026, 9, 1), 9000, 1)]
+
+        with_strict_cutoff = calculate_payout_schedule(
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 25),
+                    submitted_date=date(2026, 9, 15),
+                    submission_cutoff_day=5,
+                )
+            ],
+            **shared_kwargs,
+        )
+        assert with_strict_cutoff.allocations == [_alloc(1, date(2026, 10, 1), 9000, 1)]
+
+    def test_processing_order_follows_effective_month_not_raw_approval_time(self) -> None:
+        """Claim 1 is approved *first* (by clock time) but submitted
+        late, so its effective month is October. Claim 2 is approved
+        *second* but submitted early, so its effective month is
+        September — earlier than claim 1's. Processing must follow
+        effective-month order (claim 2 first) so claim 2 gets
+        September's own capacity, not claim 1 sweeping it up into
+        October just because it was approved first — see the module's
+        catch-up mechanic, which greedily consumes from the pointer
+        forward through whichever claim it processes first."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2026, 11, 30),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("14000"),
+                    approved_at=datetime(2026, 9, 12),  # approved first
+                    submitted_date=date(2026, 9, 10),  # after cutoff -> October
+                    submission_cutoff_day=5,
+                ),
+                ApprovedClaimInput(
+                    claim_id=2,
+                    approved_amount=Decimal("14000"),
+                    approved_at=datetime(2026, 9, 25),  # approved second
+                    submitted_date=date(2026, 9, 2),  # before cutoff -> September
+                    submission_cutoff_day=5,
+                ),
+            ],
+        )
+        assert result.allocations == [
+            _alloc(2, date(2026, 9, 1), 14000, 1),
+            _alloc(1, date(2026, 10, 1), 14000, 1),
+        ]
+        by_month = {entry.month: entry for entry in result.ledger}
+        assert by_month[date(2026, 9, 1)].claim_allocated_amount == 14000
+        assert by_month[date(2026, 10, 1)].claim_allocated_amount == 14000
+        assert by_month[date(2026, 11, 1)].claim_allocated_amount == 0
+        assert by_month[date(2026, 11, 1)].carry_forward_amount == 14000
+
+    def test_changing_cutoff_day_does_not_retroactively_reclassify_an_earlier_claim(
+        self,
+    ) -> None:
+        """The exact bug the user reported 2026-09-25: cutoff was 28 when
+        a 10k claim was submitted+approved on the 25th (same month,
+        correctly). HR then lowers the cutoff to 20. A second, 5k claim
+        submitted+approved on the 25th correctly lands in the next month
+        (25 > 20). But the first claim must NOT be swept along with it —
+        its own submission_cutoff_day snapshot (28, frozen at the time it
+        was actually submitted) must still govern it, not whatever HR
+        has since changed the setting to."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("10000"),
+                    approved_at=datetime(2026, 9, 25),
+                    submitted_date=date(2026, 9, 25),
+                    submission_cutoff_day=28,  # the cutoff in effect at the time
+                ),
+                ApprovedClaimInput(
+                    claim_id=2,
+                    approved_amount=Decimal("5000"),
+                    approved_at=datetime(2026, 9, 25),
+                    submitted_date=date(2026, 9, 25),
+                    submission_cutoff_day=20,  # HR lowered it before this one
+                ),
+            ],
+        )
+        assert result.allocations == [
+            _alloc(1, date(2026, 9, 1), 10000, 1),
+            _alloc(2, date(2026, 10, 1), 5000, 1),
+        ]
+
+
+class TestForceSameMonthPayout:
+    """User direction 2026-09-25 (same day as the financial-year gate):
+    an HR override for FY close-out (e.g. March) — while on, every
+    claim pays out in its own approval month, ignoring the submission-
+    cutoff-day deferral rule entirely."""
+
+    def test_overrides_the_cutoff_day_deferral(self) -> None:
+        """Same claim as test_submitted_after_cutoff_and_approved_same_
+        month_pays_next_month (submitted after cutoff -> would normally
+        defer to October) — with the override on, it pays in September,
+        its own approval month, instead."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=True,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 10),  # after cutoff
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 9, 1), 9000, 1)]
+
+    def test_still_cannot_move_a_claim_before_its_own_approval(self) -> None:
+        """The override skips the cutoff-adjusted month, but never moves
+        a claim's payout earlier than when HR actually approved it —
+        that's a physical impossibility, not a policy choice."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=True,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 11, 15),
+                    submitted_date=date(2026, 9, 3),  # well before cutoff
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 11, 1), 9000, 1)]
+
+    def test_sweeps_multiple_claims_into_their_shared_approval_month(self) -> None:
+        """Global scope, confirmed with the user: the override isn't
+        limited to claims at their own FY's boundary — every approval
+        is affected while it's on. Two claims that would normally land
+        in different months (one submitted in time, one late) both
+        collapse into the single month they're both approved in."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=True,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 2),  # before cutoff -> would be Sep anyway
+                    submission_cutoff_day=5,
+                ),
+                ApprovedClaimInput(
+                    claim_id=2,
+                    approved_amount=Decimal("5000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 10),  # after cutoff -> would be Oct
+                    submission_cutoff_day=5,
+                ),
+            ],
+        )
+        by_month = {entry.month: entry for entry in result.ledger}
+        assert by_month[date(2026, 9, 1)].claim_allocated_amount == 14000
+        assert by_month[date(2026, 10, 1)].claim_allocated_amount == 0
+
+    def test_off_leaves_the_cutoff_day_rule_untouched(self) -> None:
+        """Sanity check that the override is truly opt-in — with it
+        False, the same late submission defers to next month exactly as
+        every other test in TestSubmissionCutoffDay expects."""
+        result = calculate_payout_schedule(
+            child_dob=date(2015, 1, 1),
+            eligibility_start_date=date(2026, 9, 1),
+            first_year_payout_as_of_date=date(2026, 9, 1),
+            force_same_month_payout=False,
+            eligibility_end_date=date(2027, 3, 31),
+            approved_claims=[
+                ApprovedClaimInput(
+                    claim_id=1,
+                    approved_amount=Decimal("9000"),
+                    approved_at=datetime(2026, 9, 20),
+                    submitted_date=date(2026, 9, 10),  # after cutoff
+                    submission_cutoff_day=5,
+                )
+            ],
+        )
+        assert result.allocations == [_alloc(1, date(2026, 10, 1), 9000, 1)]
 
 
 def _alloc(claim_id: int, month: date, amount: int, sequence: int):

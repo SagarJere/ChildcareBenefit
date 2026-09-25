@@ -46,6 +46,18 @@ class ClaimMaster(Base):
     ClaimStatus: Mapped[str]
     Comments: Mapped[str | None] = mapped_column(nullable=True)
     SubmittedDate: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # The Childcare_PayoutSettings.SubmissionCutoffDay that was actually in
+    # effect at the moment this claim was (most recently) submitted —
+    # snapshotted here, not re-read live, so a later HR change to the
+    # cutoff day can never retroactively reclassify which month an
+    # already-submitted claim's payout lands in (user-reported bug
+    # 2026-09-25: changing the cutoff day mid-month was flipping an
+    # already-correct earlier claim to the next month on the next
+    # recompute, since payout_calculator previously always used whatever
+    # the *current* setting was for every claim). Set alongside
+    # SubmittedDate — see claim_repository.mark_submitted — so it shares
+    # that column's nullability (null only for a claim never submitted).
+    SubmissionCutoffDayAtSubmission: Mapped[int | None] = mapped_column(nullable=True)
     CreatedDate: Mapped[datetime] = mapped_column(DateTime, server_default=func.getutcdate())
     CreatedBy: Mapped[str]
     UpdatedDate: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

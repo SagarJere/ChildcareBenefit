@@ -12,8 +12,8 @@ const STATUS_TABS = ['Submitted', 'Approved', 'Rejected', 'SentBack', 'All'] as 
 
 interface OtherFilters {
   employee_id?: string
-  date_from?: string
-  date_to?: string
+  submitted_date_from?: string
+  submitted_date_to?: string
 }
 
 export function HRClaimsPage() {
@@ -64,33 +64,38 @@ export function HRClaimsPage() {
         />
         <div>
           <label htmlFor="hrQueueDateFrom" className="block text-xs font-medium text-slate-500">
-            Invoice from
+            Submitted from
           </label>
           <input
             id="hrQueueDateFrom"
             type="date"
-            value={otherFilters.date_from ?? ''}
+            value={otherFilters.submitted_date_from ?? ''}
             onChange={(e) =>
-              setOtherFilters((f) => ({ ...f, date_from: e.target.value || undefined }))
+              setOtherFilters((f) => ({
+                ...f,
+                submitted_date_from: e.target.value || undefined,
+              }))
             }
             className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
           />
         </div>
         <div>
           <label htmlFor="hrQueueDateTo" className="block text-xs font-medium text-slate-500">
-            Invoice to
+            Submitted to
           </label>
           <input
             id="hrQueueDateTo"
             type="date"
-            value={otherFilters.date_to ?? ''}
+            value={otherFilters.submitted_date_to ?? ''}
             onChange={(e) =>
-              setOtherFilters((f) => ({ ...f, date_to: e.target.value || undefined }))
+              setOtherFilters((f) => ({ ...f, submitted_date_to: e.target.value || undefined }))
             }
             className="mt-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
           />
         </div>
-        {(otherFilters.employee_id || otherFilters.date_from || otherFilters.date_to) && (
+        {(otherFilters.employee_id ||
+          otherFilters.submitted_date_from ||
+          otherFilters.submitted_date_to) && (
           <button
             type="button"
             onClick={() => setOtherFilters({})}

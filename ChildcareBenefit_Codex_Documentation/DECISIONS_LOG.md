@@ -1087,3 +1087,474 @@
     live MinIO instance, which isn't running in this environment; the
     deletion order (attachments row delete before claim delete) was
     verified by code review instead.
+73. Payout cutoff day + claims-blocked switch, Increment 1 — settings
+    table + API + block enforcement (user direction 2026-09-25).
+    Confirmed with the user before building: the "block claims" switch
+    stops employees from creating *and* submitting claims, but HR's own
+    approve/reject/send-back on already-submitted claims keeps working
+    unaffected (it's a pipeline-entry gate, not a full freeze); the
+    cutoff day itself isn't enforced yet — that's Increment 2's payout-
+    month calculation change.
+
+    New `Childcare_PayoutSettings` table (migration `a7c3e9f21b84`) — a
+    single row, deliberately created lazily on first read (`payout_
+    settings_repository.get_settings`) rather than seeded by the
+    migration, holding `SubmissionCutoffDay` (default 5, HR-restricted
+    to 1-28 so it exists in every month) and `ClaimsBlocked` (default
+    False). `GET /payout-settings` is readable by any authenticated
+    employee (the Raise Claim page will need it to show a "claims are
+    paused" banner in Increment 3); `PUT /hr/payout-settings` is HR-only.
+    New `ClaimsBlockedError` (403) checked in both `claim_service.
+    create_claim` and `submit_claim`, deliberately not in `update_claim`
+    (editing an existing Draft stays allowed) or anywhere in
+    `hr_service`.
+
+    Verified with the project's standard revert/restore methodology for
+    both enforcement points (`test_claims_blocked_prevents_new_claim_
+    creation`, `test_claims_blocked_prevents_submitting_an_existing_
+    draft`), plus coverage confirming editing and HR review both keep
+    working while blocked, HR-only/auth checks on the settings
+    endpoints, and the 1-28 range validation. Full backend suite: 193
+    passed (only pre-existing MinIO-dependent tests excluded), ruff/
+    mypy clean. Also smoke-tested end-to-end against the live dev
+    server with real data, then reset back to safe defaults (day=5,
+    unblocked) afterward so it wouldn't interfere with the user's own
+    testing.
+
+    Caught mid-testing (again): the backend dev server's `--reload`
+    flag has now twice gotten silently stuck after one reload cycle,
+    serving stale code indefinitely with no error — the same failure
+    mode as the first-year-payout catch-up work. Switched to always
+    manually restarting the dev server after backend changes rather
+    than trusting `--reload`, and dropped the flag from how it's
+    started going forward.
+74. Payout cutoff day, Increment 2 — the actual payout-month calculation
+    change (user direction 2026-09-25). Until now, `payout_calculator.
+    calculate_payout_schedule` picked a claim's payout month purely from
+    HR's approval month. Added `_effective_processing_month`: the
+    *later* of the approval month and the claim's own submission's
+    cutoff-adjusted month (`_cutoff_adjusted_month` — same month if
+    submitted on/before `SubmissionCutoffDay`, otherwise the next
+    month). This is the generalization confirmed with the user in
+    Increment 1's discussion: it reproduces both scenarios they gave
+    exactly (submit-early+approve-same-month -> that month; submit-
+    late+approve-same-month -> next month, even though approval was
+    timely), and does something sensible for the case they didn't
+    mention — a slow approval — by following the later, actual event
+    rather than back-dating to a month that's already passed.
+
+    This also changes claim *processing order* within a (child,
+    financial year), not just which month each one displays against —
+    claims are now sorted by effective month (then approval time, then
+    claim ID) instead of raw approval time, so the catch-up/pointer
+    mechanic's greedy month-consumption correctly reserves each month's
+    capacity for whichever claim actually becomes eligible for it
+    first, even if a later-effective-month claim happened to be
+    approved earlier in wall-clock time. `ApprovedClaimInput` gained a
+    `submitted_date` field; `payout_repository.
+    get_approved_claims_with_approval_time` now also selects
+    `ClaimMaster.SubmittedDate` (the latest one, if resent back and
+    resubmitted — confirmed with the user in Increment 1); `payout_
+    service.recalculate_payout` reads the *current*
+    `SubmissionCutoffDay` from `Childcare_PayoutSettings` on every full
+    rebuild (there's no meaningful way to apply an old day to old
+    claims and a new one to new claims within the same recompute, since
+    recompute has always been a full rebuild, not append-only).
+
+    Caught while fixing test fallout: `test_payout_service.py`'s
+    worked-example test backdates `ClaimApprovalHistory.ActionDate`
+    directly to simulate a multi-month timeline, but left
+    `ClaimMaster.SubmittedDate` at its real (test-run-time) value —
+    once the cutoff day started mattering, that real "today" submission
+    date pushed every claim's effective month later than the test
+    intended. Fixed by also backdating `SubmittedDate` to the 1st of
+    each claim's intended month, keeping that test purely about
+    approval-time-driven allocation as originally designed.
+
+    Verified with the project's standard revert/restore methodology,
+    including a purpose-built regression test proving the processing-
+    order fix specifically (`test_processing_order_follows_effective_
+    month_not_raw_approval_time` — approved-first-but-later-effective
+    vs. approved-second-but-earlier-effective, confirmed to fail
+    against the old raw-approval-time sort and pass against the fix),
+    plus one true end-to-end test through the real API (settings ->
+    approval -> ledger) beyond the pure-calculator unit tests. Full
+    backend suite: 199 passed (only pre-existing MinIO-dependent tests
+    excluded), ruff/mypy clean.
+75. Payout cutoff day, Increment 3 — frontend (user direction
+    2026-09-25). New HR-only `/hr/settings` page (`HRSettingsPage.tsx`,
+    linked from the HR nav next to Reports): the cutoff day input
+    (1-28) and the "pause all claims" checkbox, both read/written
+    through `GET /payout-settings` / `PUT /hr/payout-settings`. Draft
+    form values are derived during render from the loaded query data
+    (an `undefined` = "not yet touched by the user, follow the server
+    value" sentinel) rather than seeded via a `useEffect`, avoiding a
+    cascading-render lint warning and, more importantly, not clobbering
+    an in-progress edit if the query refetches in the background.
+
+    Employee-facing "claims paused" banners, all reading the same
+    `GET /payout-settings` (readable by any employee): on the My Claims
+    list (hides/greys the Raise Claim entry points), on the Raise Claim
+    page itself (in case of a direct link; still lets an already-created
+    Draft finish uploading documents, per Increment 1's "editing keeps
+    working" rule — only blocks a *new* create and the final submit),
+    and on the Claim Detail page (disables Submit, editing stays live).
+    None of this is the authorization boundary — every actual block was
+    already enforced server-side in Increment 1; this is purely so an
+    employee sees why before hitting a 403, not after.
+
+    Frontend `vite build` and `oxlint` both clean. Not independently
+    re-verified backend-side since no backend code changed in this
+    increment. As with the two prior date-picker attempts, the actual
+    rendered pages were not visually checked in a browser — no
+    browser-automation tool is available in this environment.
+76. Payout cutoff day, follow-up fix + Increment 4 (user report
+    2026-09-25: "Setting is not updating modified date and also not
+    maintaining setting changed history"). Investigated the first half
+    by reading `Childcare_PayoutSettings` directly rather than assuming
+    a backend bug — `UpdatedDate` was in fact advancing correctly on
+    every real change; the complaint was a pure frontend display gap
+    (`formatDate` shows date-only, so two saves made on the same day
+    were visually indistinguishable). Added `formatDateTime()` to
+    `format.ts` (same naive-UTC "append Z before parsing" handling as
+    the rest of the app) and switched `HRSettingsPage.tsx`'s "Last
+    updated" line to it.
+
+    The second half was a genuine gap: added `Childcare_
+    PayoutSettingsHistory` (model, migration, repository, schema,
+    service, `GET /hr/payout-settings/history`, HR-only) recording
+    before/after pairs for both `SubmissionCutoffDay` and
+    `ClaimsBlocked` — written only when a save actually changes
+    something, mirroring `ClaimApprovalHistory`'s pattern. A no-op save
+    (identical values resubmitted) writes nothing, verified by a
+    dedicated test. `HRSettingsPage.tsx` gained a "Change history"
+    section listing each entry (who, when via `formatDateTime`, and
+    which field(s) changed, worded as e.g. "Cutoff day: 5 → 12" /
+    "Claims: Resumed → Paused" — only the field(s) that actually moved).
+
+    Found and fixed along the way, independent of what the user asked
+    for: `Childcare_PayoutSettings` is a genuine single-row,
+    application-wide singleton, unlike everything else the test suite
+    touches — it is NOT scoped to any one test's data, and a rolled-
+    back test transaction still sees already-committed rows from other
+    connections (e.g. the user's own manual UI testing) under READ
+    COMMITTED isolation. Investigating this bug report had left the
+    real row at `ClaimsBlocked=True, SubmissionCutoffDay=20` from the
+    user's manual testing; running the full suite against that state
+    produced 56 failures scattered across unrelated files
+    (`test_hr.py`, `test_reports.py`, `test_security_hardening.py`,
+    `test_hr_concurrency.py`, etc.) — every claim-creation call in the
+    suite was silently 403-blocked by the real, live "claims paused"
+    flag. Fixed systemically rather than per-test: `conftest.py`'s
+    `client_with_db` fixture now resets the singleton to safe defaults
+    (day 5, unblocked) at the start of every test using it, within that
+    test's own transaction; `test_hr_concurrency.py`, which bypasses
+    `client_with_db` entirely (needs real connections for row-locking),
+    got the identical reset added directly to its own setup. Stress-
+    tested by manually re-setting the real row to blocked/day-20 again
+    and re-running the full suite — all passed — before resetting the
+    real row to safe defaults one final time.
+
+    Verified: full backend suite, 204 passed / 4 failed (all 4 pre-
+    existing, MinIO-connection-refused, unrelated to this change).
+    Frontend `vite build` and `oxlint` both clean. Nothing in this
+    entry has been committed, pushed, or applied to the production
+    database yet — migrations `a7c3e9f21b84` (settings table) and
+    `c4d8f61a9e02` (history table) exist locally only.
+77. Payout cutoff day, retroactive-reclassification bug (user report
+    2026-09-25): "Cut off date is 28th and i submitted 10k and approved
+    today, and payout is coming in this month. in the same month, HR
+    now updated cutoff date to 20 and I submitted 5k and approved
+    today, both 10k + 5k is going to next [month]." Reproduced and
+    confirmed as a real bug, not a misunderstanding — `payout_service.
+    recalculate_payout` is a full rebuild (item 74) that, until now,
+    always used whatever `Childcare_PayoutSettings.SubmissionCutoffDay`
+    currently is for *every* approved claim being recomputed, including
+    ones submitted before HR last changed it. So the ₹5k claim's own
+    approval — which triggers a full rebuild for that child's
+    eligibility — silently re-evaluated the *already correct* ₹10k
+    claim against the new cutoff (20) instead of the one actually in
+    effect (28) when it was submitted, sweeping both into next month.
+
+    Fixed by no longer treating the cutoff day as a single value for
+    the whole recompute: added `Childcare_ClaimMaster.
+    SubmissionCutoffDayAtSubmission`, populated in `claim_service.
+    submit_claim` (via `claim_repository.mark_submitted`) by reading
+    the *current* setting at the moment a claim is actually submitted,
+    then frozen on that claim from then on — alongside `SubmittedDate`,
+    overwritten together on resubmission if sent back, never touched
+    again after that. `ApprovedClaimInput` (payout_calculator.py) now
+    carries `submission_cutoff_day` per claim instead of
+    `calculate_payout_schedule` taking one global parameter;
+    `payout_repository.get_approved_claims_with_approval_time` selects
+    the new column alongside `SubmittedDate`; `payout_service.
+    recalculate_payout` no longer reads `Childcare_PayoutSettings` at
+    all — each claim already knows its own historical cutoff day.
+
+    Backfill for claims already submitted before this fix (no true
+    historical record of what cutoff day was "active" for them, since
+    the setting didn't always exist with this granularity): confirmed
+    with the user to default them all to the original default cutoff
+    day, 5, via a one-time `UPDATE ... WHERE SubmittedDate IS NOT NULL`
+    in the migration. Draft claims (never submitted) are left NULL,
+    matching `SubmittedDate`'s own nullability, and get a real value
+    whenever they're actually submitted.
+
+    Verified with two new regression tests reproducing the user's exact
+    numbers — one pure-calculator (`test_changing_cutoff_day_does_not_
+    retroactively_reclassify_an_earlier_claim`), one true end-to-end
+    through the real API and a real recompute (`test_changing_cutoff_
+    day_after_submission_does_not_move_an_approved_claim`) — both
+    confirmed to fail against the pre-fix behavior and pass against the
+    fix. Also had to restructure `test_payout_settings_cutoff_day_
+    actually_wired_through_recalculate` (item 74), which submitted its
+    claim *before* setting the cutoff day it claimed to be testing —
+    harmless before this fix (the setting was read fresh at recompute
+    time regardless of submission order) but would have silently
+    stopped proving anything once the cutoff day started being
+    snapshotted at submission instead; reordered so HR configures the
+    (non-default) cutoff day before the claim is ever submitted.
+
+    Full backend suite: 206 passed, only the same 4 pre-existing MinIO-
+    connection-refused failures excluded (unrelated). ruff and mypy
+    clean. New migration `e5f7a2b8c913` applied to the local dev
+    database and the dev server restarted to pick it up (confirmed via
+    the same "curl a known route, expect 401 not 404" smoke test used
+    throughout this session — the dev server had, again, been serving
+    stale code from before the settings-history feature even existed).
+    Not yet committed, pushed, or applied to production.
+78. Financial-year gate + same-month-payout override, Increment 1 (user
+    direction 2026-09-25): "we should not allow the user apply for next
+    FY year. HR should have option configure this date [to open next
+    FY]. Somewhere we need to give option for HR that, payout should go
+    same month" — for the March close-out crunch. This increment covers
+    the settings columns and the FY-open gate only; the same-month-
+    payout override's effect on the payout calculation is a later
+    increment.
+
+    Design corrected mid-implementation after writing the first tests
+    exposed a real contradiction: the initial plan treated the real,
+    current calendar FY as always implicitly open regardless of HR
+    action (a safety net against HR "forgetting"). But `ClaimCreateRequest`
+    already rejects any invoice date in the future, so a genuinely
+    *future* FY (the only thing that safety-net design would ever have
+    gated) can never be submitted anyway — the gate would never fire.
+    Raised this back to the user rather than guessing: the real
+    protection they want is for HR to be able to hold a *new* FY closed
+    on purpose through the March/April close-out, including right
+    through the calendar rollover, with no automatic fallback. Confirmed:
+    "No safety net — pure HR control", accepting the tradeoff that if HR
+    genuinely forgets to open a new FY, claim submission blocks app-wide
+    for every employee until they do — a materially bigger blast radius
+    than the existing ClaimsBlocked switch, but the deliberate point of
+    the feature.
+
+    Added to Childcare_PayoutSettings: `OpenFinancialYearID`/
+    `OpenFinancialYear` (denormalized label, mirroring EligibilityMaster's
+    own FinancialYearID/FinancialYear pair) — the last FY employees may
+    raise/submit claims against — and `ForceSameMonthPayout` (unused
+    until the next increment). Left NULL by the migration rather than
+    backfilled with an embedded "today" at migration-run time: since
+    Childcare_PayoutSettings is a lazily-created singleton (item 71) that
+    may not even have a row yet, `payout_settings_repository.get_settings`
+    now bootstraps `OpenFinancialYearID` to *today's* real FY exactly
+    once, the first time the row is ever read post-migration — purely so
+    the feature doesn't immediately block every claim the moment it
+    ships. After that one-time bootstrap, it only ever changes via the
+    new HR-only `POST /hr/payout-settings/open-next-financial-year`,
+    which always advances by exactly one FY *relative to whatever is
+    currently open* — not relative to today — so a click is well-defined
+    and auditable even if HR has fallen behind by more than one year
+    (each click catches up one year, logged as its own history row; two
+    clicks in a row genuinely advance two years, there is no idempotent
+    "already there" case now).
+
+    Enforced in `claim_service._resolve_eligibility_for_invoice` — shared
+    by both `create_claim` and `update_claim`, so editing a Draft's
+    invoice date into an unopened FY is blocked the same way a fresh
+    create would be. New `FinancialYearNotOpenError` → 403 in both
+    endpoint handlers. `Childcare_PayoutSettingsHistory` extended with
+    matching before/after columns for both new fields, same "only
+    written on an actual change" rule as the existing two.
+
+    Test-isolation: the same singleton-leak guard from item 76 was
+    extended to the two new columns in both `conftest.py`'s
+    `client_with_db` and `test_hr_concurrency.py` — a real HR "open next
+    FY" click (or a left-on override) would otherwise leak into the
+    whole suite exactly like SubmissionCutoffDay/ClaimsBlocked used to.
+
+    Verified with tests covering: auth/HR-only checks on the new
+    endpoint; the bootstrap allowing today's-FY claims on a fresh read;
+    the real scenario — an unopened current FY blocking claim creation
+    *and* editing an existing Draft — proven by deliberately rolling the
+    open FY back a year (not via a future invoice date, which the
+    existing validator already blocks regardless of this feature) and
+    confirming both the block and the subsequent HR-open unblock; and
+    that repeated opens each get their own history row rather than being
+    silently deduplicated. Full backend suite: 213 passed (same 4 pre-
+    existing MinIO-connection-refused failures, unrelated). ruff and
+    mypy clean. Migration `f19b6d3c8a47` applied to the local dev
+    database; dev server restarted and smoke-tested. Not yet committed,
+    pushed, or applied to production.
+79. Financial-year gate + same-month-payout override, Increment 2 (user
+    direction 2026-09-25): wires `Childcare_PayoutSettings.
+    ForceSameMonthPayout` (added but unused in Increment 1) into the
+    actual payout calculation.
+
+    `payout_calculator._effective_processing_month` gained a
+    `force_same_month_payout` flag: when true, it returns the approval
+    month directly, skipping the cutoff-adjusted-month comparison
+    entirely — still never moving a payout *earlier* than its own
+    approval, since that's a physical impossibility, not a policy
+    choice. Deliberately the mirror image of item 76's cutoff-day fix:
+    where `SubmissionCutoffDay` is snapshotted onto each claim at
+    submission time so a later setting change can't retroactively move
+    an already-submitted claim, `ForceSameMonthPayout` is the opposite
+    by design — `calculate_payout_schedule` takes it as a single value
+    for the whole recompute, and `payout_service.recalculate_payout`
+    reads it *live* from Childcare_PayoutSettings on every rebuild.
+    Confirmed scope (user direction 2026-09-25): applies globally to
+    every claim being recomputed, not just ones belonging to a financial
+    year that's actually ending — a single blunt switch, same pattern as
+    ClaimsBlocked, that HR turns on for the March/April close-out crunch
+    and off afterward.
+
+    Verified with a dedicated `TestForceSameMonthPayout` class
+    (overriding the cutoff deferral, never moving a claim before its own
+    approval, sweeping multiple claims with different would-be months
+    into their shared approval month, and a control test proving it's
+    truly opt-in) plus one true end-to-end test through the real API and
+    a real recompute (`test_force_same_month_payout_is_read_live_and_
+    sweeps_an_already_approved_claim`) — approves a claim under the
+    normal cutoff-deferred rule, confirms it lands in the deferred
+    month, then turns the override on and re-triggers `recalculate_
+    payout` directly, confirming the *already-approved* claim moves to
+    its approval month immediately. This last test is the one that would
+    have caught it if the live-vs-snapshot distinction from item 76 had
+    been copy-pasted here by mistake.
+
+    Full backend suite: 218 passed (same 4 pre-existing MinIO-
+    connection-refused failures, unrelated). ruff and mypy clean. No
+    schema change in this increment (columns already existed from
+    Increment 1) — dev server restarted and smoke-tested regardless,
+    since the calculation logic itself changed. Not yet committed,
+    pushed, or applied to production. Frontend (Increment 3) still
+    remains: the HR Settings page needs the "open next FY" button/
+    display and the "force same-month payout" checkbox, and the claim
+    pages need FY-not-open error handling.
+80. Financial-year gate + same-month-payout override, Increment 3 —
+    frontend (user direction 2026-09-25). `HRSettingsPage.tsx` gained a
+    "Force same-month payout" checkbox (same pattern as "Pause all
+    claims," wired into the existing settings form/draft-state
+    mechanism) and a new "Financial year" card showing the currently
+    open FY with an "Open next financial year" button — using the same
+    in-place confirm/cancel pattern already established for Delete
+    Claim (`isConfirmingOpenFY`, not a modal or `window.confirm`, which
+    aren't used anywhere else in this codebase), since it's a real,
+    consequential, hard-to-reverse HR action. The change-history feed's
+    `describeChange` helper extended to describe both new fields
+    (`Open financial year: 2026-27 → 2027-28`, `Same-month payout
+    override: Off → On`).
+
+    The claim pages (RaiseClaimPage.tsx, ClaimDetailPage.tsx) needed no
+    new code for the FY-not-open error: both already funnel every
+    mutation's failure through the same `extractErrorMessage`/
+    `toast.error` pattern used for every other backend error (including
+    the existing ClaimsBlockedError), and the backend's
+    `FinancialYearNotOpenError` message ("Claims for financial year
+    2027-28 are not open yet. Please contact HR.") is already clear and
+    actionable as a reactive toast — a preemptive banner would need to
+    duplicate the FY-resolution logic client-side before an invoice date
+    is even entered, which isn't worth it for what should be a rare
+    edge case once HR keeps up with opening each year.
+
+    `frontend/src/api/payoutSettings.ts` extended: `PayoutSettings`/
+    `PayoutSettingsInput`/`PayoutSettingsHistoryEntry` gained the three
+    new fields, and a new `openNextFinancialYear()` calling `POST
+    /hr/payout-settings/open-next-financial-year`.
+
+    Verified: `npm run build` (tsc -b + vite build) and `npm run lint`
+    (oxlint) both clean. Confirmed the frontend dev server was actually
+    serving the new code (fetched the live-served HRSettingsPage.tsx
+    source directly and grepped for new symbols) rather than trusting
+    its HMR log alone, given this session's repeated history of dev
+    servers silently going stale. No backend changes this increment. As
+    with every frontend change this session, not visually verified in a
+    browser — no browser-automation tool is available in this
+    environment; correctness rests on the build/lint/type checks plus
+    reusing already-proven error-handling and confirm-button patterns
+    rather than inventing new ones.
+
+    This completes all three increments of the financial-year-gate +
+    same-month-payout-override feature (items 78-80). Nothing from this
+    feature, nor its migration `f19b6d3c8a47`, has been committed,
+    pushed, or applied to production yet.
+81. Claim Approval Queue date filter switched from invoice date to
+    submitted date (user direction 2026-09-25). Clarified with the user
+    first (their initial phrasing suggested the Status tabs might also
+    be dropped) — confirmed: keep Status tabs, only replace the date
+    range. `claim_repository.get_claims_for_hr` (used solely by this
+    queue — confirmed no other caller before changing it) now filters
+    on `ClaimMaster.SubmittedDate` instead of `InvoiceDate`; params
+    renamed `date_from`/`date_to` → `submitted_date_from`/
+    `submitted_date_to` end-to-end (repository, `hr_service.list_claims`,
+    the `/hr/claims` endpoint, and the frontend) specifically so this
+    doesn't read the same as the *separate*, still invoice-date-based
+    date filter on the Claims Summary Report — same param name meaning
+    two different things across the codebase would have been a latent
+    foot-gun. SubmittedDate is a DATETIME, not a DATE, so `submitted_date_to`
+    now adds a day and uses a strict `<` bound rather than a naive `<=`
+    against midnight — otherwise a claim submitted any time other than
+    exactly 00:00 on the "to" date would have been wrongly excluded;
+    covered by a dedicated regression test. A claim never submitted
+    (SubmittedDate NULL, i.e. still Draft) is naturally excluded once
+    either bound is set — correct for an approval queue, which only
+    cares about claims that actually reached the review pipeline.
+
+    The existing `test_hr_list_filters_by_invoice_date_range` test was
+    rewritten (not just renamed): both its claims are submitted "now" in
+    real time within milliseconds of each other, so it had to backdate
+    `SubmittedDate` directly (the same synthetic-precondition-row pattern
+    already used elsewhere in this suite) to give the new filter
+    something genuine to distinguish — otherwise it would have kept
+    "passing" for the wrong reason once the param names changed (FastAPI
+    silently ignores unrecognized query params rather than erroring).
+
+    Verified: full backend suite, 219 passed (same 4 pre-existing MinIO-
+    connection-refused failures, unrelated). `npm run build`/`npm run
+    lint` clean. Both dev servers restarted/confirmed serving the new
+    code (backend via the usual "curl a query param, watch for 404 vs a
+    real response" check; frontend by fetching its live-served source
+    and grepping for the new labels, given this session's history of
+    stale dev servers). Not yet committed or pushed.
+82. Claim Approval Queue's Status control moved into the filter bar
+    (user direction 2026-09-25, follow-up to item 81). The user asked
+    for this twice — the Status *pill tabs* above the filter bar were
+    already a status filter, but weren't what they meant; clarified via
+    a second question that they wanted Status as a dropdown inside the
+    same bordered filter bar as Employee/Submitted From/To, replacing
+    the separate tabs row entirely (one unified filter bar, not two ways
+    to filter by status on the same page).
+
+    Frontend-only: `HRClaimsPage.tsx`'s separate `statusTab`/
+    `otherFilters` state collapsed into one `filters` object including
+    `status`, defaulting to "Submitted" (unchanged default view). "Clear
+    filters" now resets status back to that default too, and its
+    visibility check includes status having moved away from it — not
+    just the other fields being set, like before. No backend or API
+    contract change (`status` was already a supported `listHRClaims`
+    filter, just previously driven by tabs instead of a select).
+
+    Verified: `npm run build`/`npm run lint` clean; confirmed the dev
+    server was serving the new code by fetching its live-served source
+    directly. Not committed or pushed.
+83. Item 82 reverted (user direction 2026-09-25, same day): back to the
+    Status pill tabs above the filter bar, no Status dropdown inside it.
+    `HRClaimsPage.tsx`'s `filters` object split back into separate
+    `statusTab`/`otherFilters` state, matching the pre-item-82 code
+    exactly. Item 81 (Submitted From/To replacing Invoice date) is
+    unaffected and stays in place. No backend or API change either time
+    — `status` was already a supported filter throughout. Verified:
+    `npm run build`/`npm run lint` clean; confirmed the dev server was
+    serving the reverted code via its live-served source. Not committed
+    or pushed.

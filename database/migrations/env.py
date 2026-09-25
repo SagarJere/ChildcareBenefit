@@ -30,6 +30,8 @@ from app.models import (  # noqa: E402,F401
     eligibility,
     financial_year,
     hr_approver,
+    payout_settings,
+    payout_settings_history,
 )
 
 config = context.config

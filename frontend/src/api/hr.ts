@@ -44,8 +44,8 @@ export interface HRClaimListFilters {
   status?: string
   employee_id?: string
   child_id?: string
-  date_from?: string
-  date_to?: string
+  submitted_date_from?: string
+  submitted_date_to?: string
 }
 
 export async function listHRClaims(filters: HRClaimListFilters = {}): Promise<HRClaimSummary[]> {

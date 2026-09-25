@@ -28,6 +28,26 @@ months (From Date >= 14 months, To Date <= 72 months) — these are
 descriptive fields only and do not affect which EligibilityID the claim
 posts against (still InvoiceDate) or payout allocation (still HR approval
 time).
+
+Per user direction 2026-09-25, HR can also globally block all new claim
+creation/submission (Childcare_PayoutSettings.ClaimsBlocked) — checked in
+both create_claim and submit_claim, but deliberately not in update_claim
+(editing an already-created Draft) or anywhere in hr_service (HR's own
+review actions continue normally while blocked).
+
+submit_claim also snapshots the current SubmissionCutoffDay onto the
+claim itself (ClaimMaster.SubmissionCutoffDayAtSubmission) rather than
+letting payout_calculator.py re-read "whatever the setting is now" —
+see that column's own comment for the bug this fixes.
+
+Per user direction 2026-09-25 (same day), a claim also cannot be raised
+for a financial year later than whichever one HR has most recently
+opened (Childcare_PayoutSettings.OpenFinancialYearID) — checked in
+_resolve_eligibility_for_invoice, so it applies to both create_claim and
+update_claim (editing a Draft's invoice date is equivalent to choosing a
+financial year all over again). This is a real, explicit gate, not one
+that falls back to "the current calendar FY" on its own — see
+payout_settings_service.is_financial_year_open's own comment for why.
 """
 import io
 import re
@@ -43,8 +63,10 @@ from app.core.errors import (
     ChildNotFoundError,
     ClaimNotEditableError,
     ClaimNotFoundError,
+    ClaimsBlockedError,
     DuplicateInvoiceError,
     FileTooLargeError,
+    FinancialYearNotOpenError,
     FirstYearPayoutPeriodError,
     InvalidServicePeriodError,
     InvalidUploadError,
@@ -67,7 +89,11 @@ from app.schemas.attachment import AttachmentResponse
 from app.schemas.claim import ClaimCreateRequest, ClaimResponse, ClaimUpdateRequest
 from app.schemas.employee import EmployeeProfile
 from app.schemas.payout import PayoutScheduleEntry
-from app.services import eligibility_balance_service, eligibility_calculator
+from app.services import (
+    eligibility_balance_service,
+    eligibility_calculator,
+    payout_settings_service,
+)
 from app.services.storage import minio_client
 
 
@@ -102,6 +128,10 @@ def _resolve_eligibility_for_invoice(
         )
 
     fy = eligibility_calculator.compute_financial_year(invoice_date)
+    if not payout_settings_service.is_financial_year_open(db, fy):
+        raise FinancialYearNotOpenError(
+            f"Claims for financial year {fy.label} are not open yet. Please contact HR."
+        )
     rows = eligibility_repository.get_for_child(db, employee.memp_id, child.ChildID, fy.label)
     if not rows:
         raise NoEligibilityForPeriodError(
@@ -179,9 +209,17 @@ def _to_response(db: Session, claim) -> ClaimResponse:
     )
 
 
+def _require_claims_not_blocked(db: Session) -> None:
+    if payout_settings_service.get_settings(db).claims_blocked:
+        raise ClaimsBlockedError(
+            "HR has temporarily paused new claim submissions. Please try again later."
+        )
+
+
 def create_claim(
     db: Session, employee: EmployeeProfile, payload: ClaimCreateRequest
 ) -> ClaimResponse:
+    _require_claims_not_blocked(db)
     _check_duplicate_invoice(db, employee, payload.child_id, payload.invoice_number)
     child = _get_child_or_raise(db, employee, payload.child_id)
     eligibility = _resolve_eligibility_for_invoice(db, employee, child, payload.invoice_date)
@@ -265,11 +303,13 @@ def get_claim(db: Session, employee: EmployeeProfile, claim_id: int) -> ClaimRes
 
 def submit_claim(db: Session, employee: EmployeeProfile, claim_id: int) -> ClaimResponse:
     claim = _get_owned_editable_claim(db, employee, claim_id)
+    _require_claims_not_blocked(db)
     # Document-requirement enforcement is intentionally disabled for now —
     # see the module docstring and DECISIONS_LOG.md item 38. The
     # `requires_documents` flag in the response still tells the client
     # whether documents would normally be expected.
-    claim_repository.mark_submitted(db, claim)
+    current_cutoff_day = payout_settings_service.get_settings(db).submission_cutoff_day
+    claim_repository.mark_submitted(db, claim, submission_cutoff_day=current_cutoff_day)
     eligibility_balance_service.sync_balance(db, claim.EligibilityID)
     return _to_response(db, claim)
 

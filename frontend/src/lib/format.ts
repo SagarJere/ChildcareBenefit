@@ -15,12 +15,33 @@ const monthYearFormatter = new Intl.DateTimeFormat('en-IN', {
   year: 'numeric',
 })
 
+const dateTimeFormatter = new Intl.DateTimeFormat('en-IN', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 export function formatCurrency(amount: string | number): string {
   return currencyFormatter.format(Number(amount))
 }
 
 export function formatDate(isoDate: string): string {
   return dateFormatter.format(new Date(`${isoDate}T00:00:00`))
+}
+
+/** Formats a backend datetime (e.g. "updated_date", "changed_date") as a
+ * local date + time, e.g. "25 Sep 2026, 6:52 pm" — unlike formatDate,
+ * this keeps the time, so two changes made on the same day are visibly
+ * distinguishable (see DECISIONS_LOG.md's payout-settings follow-up,
+ * 2026-09-25). Backend DATETIME columns are naive UTC with no timezone
+ * suffix in the JSON; appended here since a bare ISO datetime string is
+ * otherwise parsed as *local* time by the Date constructor, which would
+ * display the wrong time. */
+export function formatDateTime(isoDateTime: string): string {
+  const utcSuffixed = isoDateTime.endsWith('Z') ? isoDateTime : `${isoDateTime}Z`
+  return dateTimeFormatter.format(new Date(utcSuffixed))
 }
 
 /** Formats an ISO date as just its month and year (e.g. "Sep 2026") —

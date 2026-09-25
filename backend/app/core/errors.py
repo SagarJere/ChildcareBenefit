@@ -93,3 +93,17 @@ class InvalidServicePeriodError(Exception):
     falls before the child turns 14 months old, To Date falls after the
     child turns 72 months old, or From Date is after To Date (user
     direction 2026-09-24)."""
+
+
+class ClaimsBlockedError(Exception):
+    """HR has switched on the global claims-blocked setting (Childcare_
+    PayoutSettings.ClaimsBlocked) — no new claims can be created or
+    submitted until HR turns it back off (user direction 2026-09-25).
+    HR's own review actions (approve/reject/send-back) are unaffected."""
+
+
+class FinancialYearNotOpenError(Exception):
+    """The claim's invoice date falls in a financial year later than the
+    real, current one, and HR has not opened that financial year for
+    claims yet (Childcare_PayoutSettings.OpenFinancialYearID) — user
+    direction 2026-09-25."""
