@@ -1558,3 +1558,15 @@
     `npm run build`/`npm run lint` clean; confirmed the dev server was
     serving the reverted code via its live-served source. Not committed
     or pushed.
+84. Everything from items 73-83 committed (`b40a78d`) and pushed to
+    `main`, then all 4 pending migrations applied to production
+    (`f1a4c8d9e623` -> `f19b6d3c8a47`): `a7c3e9f21b84` (payout settings),
+    `c4d8f61a9e02` (payout settings history), `e5f7a2b8c913` (claim
+    submission cutoff day snapshot), `f19b6d3c8a47` (payout settings
+    financial year gate). Confirmed via `alembic current` before (at the
+    prior head, as expected) and after (at the new head) — all 4
+    migrations are additive only (new tables/columns, one backfill
+    UPDATE for the cutoff-day snapshot), no destructive changes. The
+    production settings row does not exist yet — it will be lazy-created
+    with defaults on first read, per the established pattern, the same
+    way the local dev row was.
