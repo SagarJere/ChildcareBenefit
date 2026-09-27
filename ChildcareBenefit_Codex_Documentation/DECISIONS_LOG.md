@@ -1762,5 +1762,44 @@
     direct DB update still appears in the listing, CSV format). Full
     backend suite: 245 passed (same 4 pre-existing MinIO-unrelated
     failures). Frontend build/lint clean. Both dev servers restarted and
-    confirmed serving the new code. Not committed, pushed, or deployed
-    yet.
+    confirmed serving the new code.
+
+    Correction: items 85-89 above were committed (`9d1c655`) and pushed
+    to `main` shortly after this entry was first written — this text
+    just never got updated to say so at the time. Not applied to
+    production yet (new migration `a2c6f8e0d174` is local-only, and
+    Render deploy is manual).
+90. HR Dashboard (user direction 2026-09-27): a single hub page
+    consolidating every HR link — explicitly requested as pure
+    navigation/presentation, no change to how any existing page works.
+
+    New `/hr/dashboard` (`HRDashboardPage.tsx`): the "Overview" stat
+    cards + claims-by-status chart that used to live in the shared
+    `HomePage.tsx`'s HR-only section (relocated verbatim, same queries,
+    same components — `StatCard`/`BarChart` — just living in their own
+    file now instead of sharing space with the employee-facing home
+    page), plus a "Quick Links" grid grouped by purpose (Claims /
+    Children / Insights / Configuration) covering every HR page that
+    used to be a separate top-level nav entry.
+
+    `AppLayout.tsx`'s HR nav collapsed from 5 links (HR Queue, Add
+    Child, Bulk Add Children, Reports, Settings) to 1 ("HR Dashboard"),
+    both desktop and mobile. Since those 5 pages are no longer directly
+    reachable from the header, each gained a small "Back to HR
+    Dashboard" link at its top (`HRClaimsPage`, `HRAddChildPage`,
+    `HRBulkAddChildPage`, `ReportsPage`, `HRSettingsPage`) — the only
+    thing touched on those pages; no change to any of their actual
+    logic, matching what was asked. `HomePage.tsx`'s HR section was
+    removed rather than duplicated, since keeping it in both places
+    would have undercut the whole point (HR users would see the same
+    stats twice).
+
+    Verified: `npm run build`/`npm run lint` clean (confirms no leftover
+    references to the removed `HomePage.tsx` HR-only queries/imports —
+    `isHR`, `ClipboardList`, `CheckCircle2`, `listHRClaims`,
+    `getClaimsSummary`, `getHeadcount`, `getPayoutReport` all fully
+    gone from that file, `Users`/`BarChart` correctly kept since the
+    employee-facing content still uses them). No backend changes, so
+    only the frontend dev server needed re-confirming, not restarting.
+    Explicitly NOT committed or pushed per this request — left as
+    working-tree changes only.

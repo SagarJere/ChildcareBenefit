@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
@@ -51,6 +51,14 @@ export function HRAddChildPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
+      <Link
+        to="/hr/dashboard"
+        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to HR Dashboard
+      </Link>
+
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Add Child</h1>
         <p className="mt-1 text-slate-600">

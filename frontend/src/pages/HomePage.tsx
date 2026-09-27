@@ -1,21 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  CheckCircle2,
-  ClipboardList,
-  FileText,
-  Loader2,
-  PiggyBank,
-  Plus,
-  Users,
-  Wallet,
-} from 'lucide-react'
+import { FileText, Loader2, PiggyBank, Plus, Users, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { listClaims } from '../api/claims'
 import { listChildren } from '../api/children'
 import { getEligibilityReport, getMyFirstYearPayoutReport, getMyPayoutReport } from '../api/eligibility'
-import { listHRClaims } from '../api/hr'
-import { getClaimsSummary, getHeadcount, getPayoutReport } from '../api/reports'
 import { BarChart, type BarChartDatum } from '../components/BarChart'
 import { StatCard } from '../components/StatCard'
 import { ClaimStatusBadge } from '../features/claims/ClaimStatusBadge'
@@ -29,12 +18,10 @@ const MONTH_KEYS = [
   'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar',
 ] as const
 
-const STATUS_DISPLAY_ORDER = ['Draft', 'Submitted', 'SentBack', 'Approved', 'Rejected'] as const
 const ACTIVE_CLAIM_STATUSES = new Set(['Draft', 'Submitted', 'SentBack'])
 
 export function HomePage() {
   const { employee } = useAuth()
-  const isHR = Boolean(employee?.is_hr_approver)
   const currentFY = currentFinancialYearLabel()
 
   const childrenQuery = useQuery({ queryKey: ['children'], queryFn: listChildren })
@@ -58,27 +45,6 @@ export function HomePage() {
   const eligibilityReportQuery = useQuery({
     queryKey: ['eligibility-report'],
     queryFn: getEligibilityReport,
-  })
-
-  const hrPendingQuery = useQuery({
-    queryKey: ['hr-claims', { status: 'Submitted' }],
-    queryFn: () => listHRClaims({ status: 'Submitted' }),
-    enabled: isHR,
-  })
-  const headcountQuery = useQuery({
-    queryKey: ['report-headcount'],
-    queryFn: getHeadcount,
-    enabled: isHR,
-  })
-  const claimsSummaryQuery = useQuery({
-    queryKey: ['report-claims-summary', {}],
-    queryFn: () => getClaimsSummary({}),
-    enabled: isHR,
-  })
-  const hrPayoutQuery = useQuery({
-    queryKey: ['report-payout', {}],
-    queryFn: () => getPayoutReport({}),
-    enabled: isHR,
   })
 
   const activeClaimsCount = (claimsQuery.data ?? []).filter((c) =>
@@ -106,13 +72,6 @@ export function HomePage() {
         (sum, row) => sum + Number(row[key]),
         0,
       ),
-  }))
-
-  const claimsByStatusData: BarChartDatum[] = STATUS_DISPLAY_ORDER.filter(
-    (status) => (claimsSummaryQuery.data?.totals.count_by_status[status] ?? 0) > 0,
-  ).map((status) => ({
-    label: status,
-    value: claimsSummaryQuery.data?.totals.count_by_status[status] ?? 0,
   }))
 
   return (
@@ -296,58 +255,6 @@ export function HomePage() {
         </div>
       </div>
 
-      {isHR && (
-        <div className="space-y-4 border-t border-slate-200 pt-8">
-          <h2 className="text-lg font-semibold text-slate-900">HR Overview</h2>
-
-          <div className="flex flex-wrap gap-2">
-            <Link
-              to="/hr/claims"
-              className="flex items-center gap-1.5 rounded-md bg-indigo-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-800"
-            >
-              <ClipboardList className="h-4 w-4" aria-hidden="true" />
-              HR Queue
-            </Link>
-            <Link
-              to="/hr/reports"
-              className="flex items-center gap-1.5 rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
-            >
-              Reports
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <StatCard
-              icon={ClipboardList}
-              label="Pending Review"
-              value={hrPendingQuery.data?.length ?? '—'}
-              to="/hr/claims"
-              accent="amber"
-            />
-            <StatCard
-              icon={Users}
-              label="Employees with Children"
-              value={headcountQuery.data?.total_employees_with_children ?? '—'}
-            />
-            <StatCard
-              icon={CheckCircle2}
-              label="Total Approved Payout"
-              value={
-                hrPayoutQuery.data ? formatCurrency(hrPayoutQuery.data.totals.total_payout) : '—'
-              }
-              to="/hr/reports"
-              accent="emerald"
-            />
-          </div>
-
-          {claimsByStatusData.length > 0 && (
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-3 font-medium text-slate-900">Claims by Status</h3>
-              <BarChart data={claimsByStatusData} />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }

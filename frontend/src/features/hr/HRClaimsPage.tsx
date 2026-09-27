@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, ClipboardList, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ClipboardList, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -31,6 +31,14 @@ export function HRClaimsPage() {
 
   return (
     <div className="space-y-6">
+      <Link
+        to="/hr/dashboard"
+        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to HR Dashboard
+      </Link>
+
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Claim Approval Queue</h1>
         <p className="mt-1 text-slate-600">Review and act on employee childcare benefit claims.</p>

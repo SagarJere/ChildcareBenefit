@@ -35,23 +35,9 @@ export function AppLayout() {
               My Payout
             </NavLink>
             {employee?.is_hr_approver && (
-              <>
-                <NavLink to="/hr/claims" className={navLinkClasses}>
-                  HR Queue
-                </NavLink>
-                <NavLink to="/hr/children/new" className={navLinkClasses}>
-                  Add Child
-                </NavLink>
-                <NavLink to="/hr/children/bulk" className={navLinkClasses}>
-                  Bulk Add Children
-                </NavLink>
-                <NavLink to="/hr/reports" className={navLinkClasses}>
-                  Reports
-                </NavLink>
-                <NavLink to="/hr/settings" className={navLinkClasses}>
-                  Settings
-                </NavLink>
-              </>
+              <NavLink to="/hr/dashboard" className={navLinkClasses}>
+                HR Dashboard
+              </NavLink>
             )}
           </nav>
 
@@ -88,23 +74,9 @@ export function AppLayout() {
             My Payout
           </NavLink>
           {employee?.is_hr_approver && (
-            <>
-              <NavLink to="/hr/claims" className={navLinkClasses}>
-                HR Queue
-              </NavLink>
-              <NavLink to="/hr/children/new" className={navLinkClasses}>
-                Add Child
-              </NavLink>
-              <NavLink to="/hr/children/bulk" className={navLinkClasses}>
-                Bulk Add Children
-              </NavLink>
-              <NavLink to="/hr/reports" className={navLinkClasses}>
-                Reports
-              </NavLink>
-              <NavLink to="/hr/settings" className={navLinkClasses}>
-                Settings
-              </NavLink>
-            </>
+            <NavLink to="/hr/dashboard" className={navLinkClasses}>
+              HR Dashboard
+            </NavLink>
           )}
         </nav>
       </header>

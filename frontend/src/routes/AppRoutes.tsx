@@ -16,6 +16,7 @@ import { HRBulkUploadHistoryDetailPage } from '../features/hr/HRBulkUploadHistor
 import { HRBulkUploadHistoryPage } from '../features/hr/HRBulkUploadHistoryPage'
 import { HRClaimDetailPage } from '../features/hr/HRClaimDetailPage'
 import { HRClaimsPage } from '../features/hr/HRClaimsPage'
+import { HRDashboardPage } from '../features/hr/HRDashboardPage'
 import { HRSettingsPage } from '../features/hr/HRSettingsPage'
 import { ReportsPage } from '../features/hr/ReportsPage'
 import { MyPayoutPage } from '../features/payout/MyPayoutPage'
@@ -38,6 +39,7 @@ export function AppRoutes() {
           <Route path="/claims/new" element={<RaiseClaimPage />} />
           <Route path="/claims/:claimId" element={<ClaimDetailPage />} />
           <Route element={<HRRoute />}>
+            <Route path="/hr/dashboard" element={<HRDashboardPage />} />
             <Route path="/hr/claims" element={<HRClaimsPage />} />
             <Route path="/hr/claims/:claimId" element={<HRClaimDetailPage />} />
             <Route path="/hr/children/new" element={<HRAddChildPage />} />
