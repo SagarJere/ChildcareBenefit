@@ -18,6 +18,26 @@ class MaxChildrenExceededError(Exception):
     """The employee already has the maximum of two children on record."""
 
 
+class EmployeeNotFoundError(Exception):
+    """No active employee exists with the given Employee ID — raised for
+    HR-facing lookups (e.g. HR adding a child on an employee's behalf,
+    user direction 2026-09-26), where the caller already knows a real
+    Employee ID is expected and enumeration isn't a concern the way it
+    is for login (see AuthenticationError's own comment)."""
+
+
+class BulkFileFormatError(Exception):
+    """The uploaded bulk-add-children file isn't usable at all (not valid
+    UTF-8 text, missing required columns, or no data rows) — a file-
+    level problem, not a per-row one, so nothing in it can be
+    previewed or processed (user direction 2026-09-26)."""
+
+
+class BulkRowLimitExceededError(Exception):
+    """The uploaded bulk-add-children file has more data rows than one
+    upload may contain (user direction 2026-09-26)."""
+
+
 class DuplicateChildError(Exception):
     """A child with this exact name and date of birth already exists for
     this employee — most likely a duplicate submission (e.g. the user

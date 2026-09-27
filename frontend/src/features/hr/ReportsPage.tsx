@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { ChildDetailsReport } from './ChildDetailsReport'
 import { ClaimsSummaryReport } from './ClaimsSummaryReport'
 import { EligibilityUtilizationReport } from './EligibilityUtilizationReport'
 import { HeadcountReport } from './HeadcountReport'
@@ -11,6 +12,7 @@ const TABS = [
   { key: 'payout', label: 'Payout' },
   { key: 'firstYearPayout', label: 'First Year Payout' },
   { key: 'headcount', label: 'Headcount' },
+  { key: 'childDetails', label: 'Child Details' },
 ] as const
 
 type TabKey = (typeof TABS)[number]['key']
@@ -23,7 +25,8 @@ export function ReportsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Reports</h1>
         <p className="mt-1 text-slate-600">
-          Claims, eligibility utilization, payout, first year payout, and headcount.
+          Claims, eligibility utilization, payout, first year payout, headcount, and child
+          details.
         </p>
       </div>
 
@@ -49,6 +52,7 @@ export function ReportsPage() {
       {tab === 'payout' && <PayoutReport source="claim" />}
       {tab === 'firstYearPayout' && <PayoutReport source="first_year" />}
       {tab === 'headcount' && <HeadcountReport />}
+      {tab === 'childDetails' && <ChildDetailsReport />}
     </div>
   )
 }

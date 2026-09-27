@@ -21,6 +21,8 @@ from app.repositories import (
 )
 from app.schemas.eligibility import EmployeeEligibilityReportResponse, EmployeeEligibilityReportRow
 from app.schemas.reports import (
+    ChildDetailsResponse,
+    ChildDetailsRow,
     ClaimsSummaryResponse,
     ClaimsSummaryTotals,
     ClaimSummaryRow,
@@ -348,6 +350,30 @@ def build_payout_report(
             total_payout=sum((row.total_payout for row in rows), Decimal("0"))
         ),
     )
+
+
+def build_child_details(db: Session, *, employee_id: str | None) -> ChildDetailsResponse:
+    children = child_repository.get_all_children(db, employee_id=employee_id)
+    employee_names = employee_repository.get_names_by_employee_ids(
+        db, [child.EmployeeID for child in children]
+    )
+    rows = [
+        ChildDetailsRow(
+            employee_id=child.EmployeeID,
+            employee_name=employee_names.get(child.EmployeeID, child.EmployeeID),
+            child_id=child.ChildID,
+            child_sequence_no=child.ChildSequenceNo,
+            child_name=child.ChildName,
+            child_dob=child.ChildDOB,
+            is_active=child.IsActive,
+            created_date=child.CreatedDate,
+            created_by=child.CreatedBy,
+            updated_date=child.UpdatedDate,
+            updated_by=child.UpdatedBy,
+        )
+        for child in children
+    ]
+    return ChildDetailsResponse(rows=rows)
 
 
 def rows_to_csv(rows: list[dict], fieldnames: list[str]) -> str:

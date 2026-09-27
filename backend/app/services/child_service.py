@@ -14,10 +14,16 @@ from sqlalchemy.orm import Session
 from app.core.errors import (
     ChildNotFoundError,
     DuplicateChildError,
+    EmployeeNotFoundError,
     MaxChildrenExceededError,
     MissingJoinDateError,
 )
-from app.repositories import child_repository, eligibility_repository, financial_year_repository
+from app.repositories import (
+    child_repository,
+    eligibility_repository,
+    employee_repository,
+    financial_year_repository,
+)
 from app.repositories.child_repository import MAX_CHILDREN_PER_EMPLOYEE
 from app.schemas.child import ChildResponse
 from app.schemas.eligibility import EligibilityPreview, EligibilityResponse
@@ -80,8 +86,19 @@ def preview_eligibility(
 
 
 def add_child(
-    db: Session, employee: EmployeeProfile, child_name: str, child_dob: date
+    db: Session,
+    employee: EmployeeProfile,
+    child_name: str,
+    child_dob: date,
+    *,
+    created_by: str | None = None,
 ) -> ChildResponse:
+    """`created_by` defaults to the child's own employee (self-service
+    add) — pass the acting HR user's Employee ID instead when adding on
+    an employee's behalf (user direction 2026-09-26; see
+    add_child_for_employee), so the audit trail shows who actually
+    performed the add rather than always looking like a self-add."""
+    created_by = created_by or employee.employee_id
     join_date = _require_join_date(employee)
 
     existing_children = child_repository.get_active_children(db, employee.memp_id)
@@ -132,7 +149,7 @@ def add_child(
                 sequence_no=sequence_no,
                 child_name=child_name,
                 child_dob=child_dob,
-                created_by=employee.employee_id,
+                created_by=created_by,
             )
     except IntegrityError as exc:
         raise DuplicateChildError(
@@ -195,6 +212,30 @@ def add_child(
             eligibility_balance_service.sync_balance(db, next_eligibility.EligibilityID)
 
     return ChildResponse.from_orm_model(child, EligibilityResponse.from_orm_model(eligibility))
+
+
+def add_child_for_employee(
+    db: Session,
+    *,
+    target_employee_id: str,
+    child_name: str,
+    child_dob: date,
+    added_by: str,
+) -> ChildResponse:
+    """HR adding a child on behalf of another employee (user direction
+    2026-09-26). Builds that employee's own EmployeeProfile and reuses
+    add_child completely unchanged — every rule (2-child cap, duplicate
+    check, eligibility calculation, first-year payout) applies exactly
+    as it would for a self-service add; only `created_by` differs, so
+    the audit trail shows the HR user who actually did this rather than
+    the target employee."""
+    employee_row = employee_repository.get_by_employee_id(db, target_employee_id)
+    if employee_row is None or not employee_row.is_active:
+        raise EmployeeNotFoundError(
+            f"No active employee found with Employee ID {target_employee_id!r}."
+        )
+    target_employee = EmployeeProfile.from_orm_model(employee_row)
+    return add_child(db, target_employee, child_name, child_dob, created_by=added_by)
 
 
 def list_children(db: Session, employee: EmployeeProfile) -> list[ChildResponse]:

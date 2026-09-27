@@ -23,6 +23,7 @@ from app.database.base import Base  # noqa: E402
 # Import model modules here as they are added in later increments so that
 # Base.metadata is populated for autogenerate support.
 from app.models import (  # noqa: E402,F401
+    bulk_add_children,
     child,
     claim,
     claim_approval_history,

@@ -93,6 +93,28 @@ export interface PayoutReportResponse {
   }
 }
 
+export interface ChildDetailsRow {
+  employee_id: string
+  employee_name: string
+  child_id: string
+  child_sequence_no: number
+  child_name: string
+  child_dob: string
+  is_active: boolean
+  created_date: string
+  created_by: string
+  updated_date: string | null
+  updated_by: string | null
+}
+
+export interface ChildDetailsResponse {
+  rows: ChildDetailsRow[]
+}
+
+export interface ChildDetailsFilters {
+  employee_id?: string
+}
+
 export interface ClaimsSummaryFilters {
   date_from?: string
   date_to?: string
@@ -155,6 +177,15 @@ export async function getFirstYearPayoutReport(
   filters: PayoutReportFilters,
 ): Promise<PayoutReportResponse> {
   const { data } = await apiClient.get<PayoutReportResponse>('/hr/reports/payout/first-year', {
+    params: filters,
+  })
+  return data
+}
+
+export async function getChildDetails(
+  filters: ChildDetailsFilters,
+): Promise<ChildDetailsResponse> {
+  const { data } = await apiClient.get<ChildDetailsResponse>('/hr/reports/child-details', {
     params: filters,
   })
   return data

@@ -10,6 +10,10 @@ import { ClaimsPage } from '../features/claims/ClaimsPage'
 import { RaiseClaimPage } from '../features/claims/RaiseClaimPage'
 import { EligibilityReportPage } from '../features/eligibility/EligibilityReportPage'
 import { PayoutScheduleDetailPage } from '../features/eligibility/PayoutScheduleDetailPage'
+import { HRAddChildPage } from '../features/hr/HRAddChildPage'
+import { HRBulkAddChildPage } from '../features/hr/HRBulkAddChildPage'
+import { HRBulkUploadHistoryDetailPage } from '../features/hr/HRBulkUploadHistoryDetailPage'
+import { HRBulkUploadHistoryPage } from '../features/hr/HRBulkUploadHistoryPage'
 import { HRClaimDetailPage } from '../features/hr/HRClaimDetailPage'
 import { HRClaimsPage } from '../features/hr/HRClaimsPage'
 import { HRSettingsPage } from '../features/hr/HRSettingsPage'
@@ -36,6 +40,13 @@ export function AppRoutes() {
           <Route element={<HRRoute />}>
             <Route path="/hr/claims" element={<HRClaimsPage />} />
             <Route path="/hr/claims/:claimId" element={<HRClaimDetailPage />} />
+            <Route path="/hr/children/new" element={<HRAddChildPage />} />
+            <Route path="/hr/children/bulk" element={<HRBulkAddChildPage />} />
+            <Route path="/hr/children/bulk/history" element={<HRBulkUploadHistoryPage />} />
+            <Route
+              path="/hr/children/bulk/history/:bulkUploadId"
+              element={<HRBulkUploadHistoryDetailPage />}
+            />
             <Route path="/hr/reports" element={<ReportsPage />} />
             <Route path="/hr/settings" element={<HRSettingsPage />} />
           </Route>

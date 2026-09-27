@@ -1570,3 +1570,197 @@
     production settings row does not exist yet — it will be lazy-created
     with defaults on first read, per the established pattern, the same
     way the local dev row was.
+85. HR-add-child, Increment 1 (user direction 2026-09-26): "Give an
+    option for HR to add new child for any employee ... 1 child at a
+    time, or bulk upload." This covers single-add only; bulk upload is
+    a later increment.
+
+    Backend: `child_service.add_child` gained an optional `created_by`
+    parameter (defaults to the target employee, preserving existing
+    self-service behavior exactly) — confirmed with the user that an
+    HR-initiated add should record the *acting HR user* in the audit
+    trail, not the employee whose child it is (matching how claim
+    approvals record who acted, not who's affected). New
+    `add_child_for_employee` looks up the target employee (new
+    `EmployeeNotFoundError` if they don't exist or aren't active — the
+    existing `AuthenticationError` was deliberately unsuitable to reuse
+    here, since its generic message exists specifically to prevent
+    Employee ID enumeration at login, which isn't a concern for an
+    HR-only endpoint that already knows the ID it's looking up) and then
+    calls `add_child` completely unchanged — every existing rule
+    (2-child cap, duplicate-name+DOB check, eligibility calculation,
+    automatic first-year payout) applies exactly as it does for a
+    self-service add, with zero business-logic duplication. New HR-only
+    `POST /hr/children`.
+
+    Frontend: new `/hr/children/new` page — the existing self-service
+    Add Child form (name + DOB) with an employee picker prepended,
+    reusing the `EmployeeAutocomplete` component already shared by every
+    HR report's employee filter. Deliberately skips the eligibility-
+    preview-as-you-type feature the self-service page has (that calls a
+    self-service-only endpoint scoped to the caller's own profile) —
+    out of scope for this increment; HR sees the created eligibility in
+    the success toast/response instead. On success, the form resets in
+    place rather than navigating away, since HR may be adding children
+    for several different employees in one sitting. New "Add Child" nav
+    link alongside the other HR nav items (desktop and mobile).
+
+    Verified: new `test_hr_add_child.py` (auth/HR-only checks, correct
+    CreatedBy recorded via direct DB read since ChildResponse doesn't
+    expose it, unknown-employee 404, missing-join-date 400, the 2-child
+    cap, and the duplicate-name+DOB check) — full backend suite 226
+    passed (same 4 pre-existing MinIO-unrelated failures). `npm run
+    build`/`npm run lint` clean. Both dev servers restarted fresh this
+    session (prior ones were from before a session restart) and
+    confirmed serving the new code. Not committed, pushed, or applied to
+    production yet.
+86. HR-add-child, Increment 2 — bulk upload (user direction 2026-09-26).
+    Confirmed with the user beforehand: two-step preview-then-confirm
+    flow, best-effort per-row rather than all-or-nothing.
+
+    The key design decision: preview and commit run the exact same
+    per-row code path — parse the CSV, then call `add_child_for_employee`
+    for each row — rather than maintaining a separately-written
+    "simulate what would happen" validator that could drift from the
+    real rules over time. Preview just wraps the whole pass in one more
+    SAVEPOINT that's unconditionally rolled back at the end
+    (`child_bulk_service.preview_bulk_add_children`), so the response
+    reflects exactly what committing would do without anything actually
+    persisting. Each row also gets its own SAVEPOINT, so one row's
+    business-rule failure (unknown employee, 2-child cap, duplicate,
+    bad date) doesn't affect any other row — and because
+    `add_child_for_employee` flushes its writes, a later row's cap/
+    duplicate check correctly sees earlier rows *from the same file*
+    that already succeeded, not just what was already in the database
+    before the upload.
+
+    New `POST /hr/children/bulk/preview` and `POST /hr/children/bulk/
+    commit`, both taking the same CSV file (`employee_id,child_name,
+    child_dob`); the frontend re-uploads the identical `File` object to
+    commit after HR reviews the preview, no server-side session/token
+    needed to connect the two calls. New `BulkFileFormatError` (bad
+    file entirely — wrong columns, not UTF-8, empty) and
+    `BulkRowLimitExceededError` (over 200 data rows per upload — kept
+    deliberately conservative, since each row can be several DB round
+    trips against a remote SQL Server: create child, create eligibility,
+    possibly a next-FY eligibility row and first-year-payout recompute).
+
+    Frontend: new `/hr/children/bulk` page — file input, a client-side-
+    generated CSV template download (no backend round trip needed for a
+    static string), a preview results table, a "Confirm and add N
+    children" step, then a final results table. Cross-linked with the
+    single-add page in both directions. New "Bulk Add Children" nav
+    link alongside "Add Child."
+
+    Verified: new `test_hr_bulk_add_child.py` — auth/HR-only checks,
+    malformed-file and row-limit rejection, preview persisting nothing
+    (checked via a direct DB query, not just the response), commit
+    actually persisting with the correct CreatedBy, one bad row not
+    blocking the good rows in the same file, the 2-child cap and
+    duplicate check both applying cumulatively *within* one uploaded
+    file (not just against pre-existing data), and a bad date being
+    reported without stopping the batch. Full backend suite: 236 passed
+    (same 4 pre-existing MinIO-unrelated failures). `npm run build`/
+    `npm run lint` clean. Backend dev server had gone stale again (started
+    before these endpoints were added) — restarted and confirmed serving
+    the new routes; frontend dev server confirmed serving the new page.
+    Not committed, pushed, or applied to production yet.
+
+    This completes both increments of the HR-add-child feature (items
+    85-86).
+87. Bulk-add-children date parsing widened to accept DD-MM-YYYY, not
+    just strict ISO (user-reported bug 2026-09-26: "child_dob
+    '23-12-2023' is not a valid date" while uploading a real file).
+    Excel commonly exports/displays dates in day-first format for this
+    locale (India), so a file with dates like that was always going to
+    fail against `date.fromisoformat` alone.
+
+    `child_bulk_service._parse_child_dob` now tries `%Y-%m-%d` then
+    `%d-%m-%Y` then `%d/%m/%Y`, in that order. Deliberately does NOT
+    also accept US-style MM-DD-YYYY: for day <= 12 that's genuinely
+    ambiguous with DD-MM-YYYY, and guessing wrong would silently record
+    an incorrect date of birth instead of failing loudly — worse than
+    the original bug. Error message and the frontend page's helper text
+    both updated to mention both accepted formats.
+
+    Verified with a new test confirming "23-12-2023" parses as 23
+    December 2023 specifically (day and month in the right fields, not
+    just "some date" succeeding) — full backend suite 237 passed (same
+    4 pre-existing MinIO-unrelated failures). Frontend build/lint clean.
+    Backend dev server restarted and confirmed serving the fix. Not
+    committed, pushed, or deployed yet.
+88. Bulk-add-children audit trail (user direction 2026-09-26): "HR may
+    argue after sometime that they uploaded 2 children but added only
+    one. How do I defend this?" Confirmed table structure with the user
+    before building (two tables, mirroring the existing claim/approval-
+    history one-to-many pattern), then went ahead once confirmed —
+    only tweak requested was naming the column `UploadedFileName`.
+
+    New `Childcare_BulkAddChildrenBatch` (one row per *commit* attempt —
+    never preview, since preview never persists anything) and
+    `Childcare_BulkAddChildrenRow` (one row per CSV row, FK to the
+    batch). `ChildDOBRaw` is kept as the literal text from the file, not
+    a date column, so a row that failed to parse at all is still fully
+    recorded — "what did HR actually type" is never in question.
+    `child_bulk_service.commit_bulk_add_children` now records the batch
+    right after processing, regardless of outcome (even a batch where
+    every row failed is worth a permanent record — "HR ran this and it
+    all failed for reason X" is exactly the kind of thing a dispute
+    might ask about too).
+
+    Migration note: `Childcare_BulkAddChildrenRow.ChildID`'s FK to
+    `Childcare_ChildMaster.ChildID` failed to create the first time —
+    SQL Server requires an exact length/scale match between FK and
+    referenced columns, and the real `ChildID` column turned out to be
+    `VARCHAR(30)` (checked via INFORMATION_SCHEMA), not the `VARCHAR(50)`
+    guessed from other string fields' convention. Fixed and reapplied;
+    confirmed alembic's transactional DDL had cleanly rolled back the
+    first (partially-run) attempt with nothing left behind before
+    fixing and retrying.
+
+    New `GET /hr/children/bulk/history` (list) and `GET /hr/children/
+    bulk/history/{id}` (detail, reusing the same `BulkChildRowResult`
+    shape the commit/preview responses already use) — HR-only. Frontend:
+    a "Bulk Upload History" page (list) drilling into a detail page per
+    batch, both linked from the bulk-add page. The existing inline
+    results table component was extracted to a shared
+    `BulkChildResultsTable.tsx` so the bulk-add page and both history
+    pages render results identically — and its CSV-export helper had to
+    move to its own non-component file after oxlint's fast-refresh rule
+    flagged mixing a component export with a plain function export in
+    one file. Added, as the confirmed "quick win" alongside the audit
+    trail: a "Download results as CSV" button after a real commit (and
+    on the history detail page) — a second, HR-owned copy of the exact
+    outcome that doesn't depend on this feature at all.
+
+    Verified: 5 new tests — commit persisting the correct batch/row
+    data (including a duplicate-rejection message stored verbatim),
+    preview creating no batch record at all, history list/detail auth
+    and content, and a 404 for an unknown batch id. Full backend suite:
+    242 passed (same 4 pre-existing MinIO-unrelated failures). Frontend
+    build/lint clean. Both dev servers restarted/confirmed serving the
+    new code. Not committed, pushed, or deployed yet.
+89. New "Child Details" HR report (user direction 2026-09-27): every row
+    on `Childcare_ChildMaster`, plain and simple — built by mirroring the
+    existing Eligibility Utilization report's structure exactly (same
+    filter-bar/table/CSV-export shape every HR report already uses), no
+    new UI pattern introduced.
+
+    New `child_repository.get_all_children` — unscoped across employees
+    *and* deliberately not filtered by `IsActive`, unlike the existing
+    `get_all_active_children` (used by other reports) — the point of
+    this report is a complete listing of the master table, not just
+    active rows, even though child deactivation isn't actually a real
+    workflow anywhere in the app yet. New `report_service.
+    build_child_details` (fetch + bulk employee-name lookup, no joins/
+    aggregates needed — simpler than every other report). New `GET
+    /hr/reports/child-details` (optional `employee_id` filter, `format=
+    json|csv` like every other report endpoint) and a "Child Details"
+    tab on the existing Reports page.
+
+    Verified: 3 new tests (HR-only, an inactive child backdated via
+    direct DB update still appears in the listing, CSV format). Full
+    backend suite: 245 passed (same 4 pre-existing MinIO-unrelated
+    failures). Frontend build/lint clean. Both dev servers restarted and
+    confirmed serving the new code. Not committed, pushed, or deployed
+    yet.

@@ -32,6 +32,17 @@ class ChildCreateRequest(ChildDobMixin):
     child_name: str = Field(min_length=1, max_length=200)
 
 
+class HRChildCreateRequest(ChildDobMixin):
+    """HR adding a child on behalf of another employee (user direction
+    2026-09-26) — same as ChildCreateRequest, plus the target employee's
+    Employee ID."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    employee_id: str = Field(min_length=1, max_length=50)
+    child_name: str = Field(min_length=1, max_length=200)
+
+
 class ChildResponse(BaseModel):
     child_id: str
     employee_id: str

@@ -39,6 +39,12 @@ export function AppLayout() {
                 <NavLink to="/hr/claims" className={navLinkClasses}>
                   HR Queue
                 </NavLink>
+                <NavLink to="/hr/children/new" className={navLinkClasses}>
+                  Add Child
+                </NavLink>
+                <NavLink to="/hr/children/bulk" className={navLinkClasses}>
+                  Bulk Add Children
+                </NavLink>
                 <NavLink to="/hr/reports" className={navLinkClasses}>
                   Reports
                 </NavLink>
@@ -85,6 +91,12 @@ export function AppLayout() {
             <>
               <NavLink to="/hr/claims" className={navLinkClasses}>
                 HR Queue
+              </NavLink>
+              <NavLink to="/hr/children/new" className={navLinkClasses}>
+                Add Child
+              </NavLink>
+              <NavLink to="/hr/children/bulk" className={navLinkClasses}>
+                Bulk Add Children
               </NavLink>
               <NavLink to="/hr/reports" className={navLinkClasses}>
                 Reports

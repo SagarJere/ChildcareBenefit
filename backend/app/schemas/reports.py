@@ -128,3 +128,27 @@ class PayoutReportTotals(BaseModel):
 class PayoutReportResponse(BaseModel):
     rows: list[PayoutReportRow]
     totals: PayoutReportTotals
+
+
+class ChildDetailsRow(BaseModel):
+    """Every column on Childcare_ChildMaster, plus the employee's name
+    for readability — matching every other report's convention of
+    resolving an ID to a name (user direction 2026-09-27). Not scoped to
+    active children only, since the whole point is a complete listing
+    of the master table."""
+
+    employee_id: str
+    employee_name: str
+    child_id: str
+    child_sequence_no: int
+    child_name: str
+    child_dob: date
+    is_active: bool
+    created_date: datetime
+    created_by: str
+    updated_date: datetime | None
+    updated_by: str | None
+
+
+class ChildDetailsResponse(BaseModel):
+    rows: list[ChildDetailsRow]

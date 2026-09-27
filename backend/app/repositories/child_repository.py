@@ -55,6 +55,20 @@ def get_all_active_children(db: Session) -> list[ChildMaster]:
     )
 
 
+def get_all_children(db: Session, *, employee_id: str | None = None) -> list[ChildMaster]:
+    """Unscoped (across all employees) and *not* filtered by IsActive —
+    for the Child Details report (user direction 2026-09-27), which is
+    meant to show every row on file, not just active ones."""
+    stmt = select(ChildMaster)
+    if employee_id is not None:
+        stmt = stmt.where(ChildMaster.EmployeeID == employee_id)
+    return list(
+        db.execute(stmt.order_by(ChildMaster.EmployeeID, ChildMaster.ChildSequenceNo))
+        .scalars()
+        .all()
+    )
+
+
 def next_sequence_number(existing_children: list[ChildMaster]) -> int:
     used = {child.ChildSequenceNo for child in existing_children}
     for candidate in VALID_SEQUENCE_NUMBERS:

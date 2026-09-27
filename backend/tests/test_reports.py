@@ -6,6 +6,9 @@ transaction that is always rolled back — see conftest.py.
 from datetime import datetime
 
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
+from app.models.child import ChildMaster
 
 
 def _add_child(client: TestClient, name: str, dob: str) -> dict:
@@ -264,3 +267,60 @@ def test_headcount_csv_format(login_as, make_hr_approver, make_employee) -> None
     assert response.headers["content-type"].startswith("text/csv")
     assert "metric,value" in response.text
     assert "total_children" in response.text
+
+
+def test_child_details_requires_hr(login_as) -> None:
+    client = login_as(memp_id=940012, employee_id="94000012", Joindate=datetime(2018, 1, 1))
+    assert client.get("/api/v1/hr/reports/child-details").status_code == 403
+
+
+def test_child_details_lists_every_child_including_inactive(
+    login_as, make_hr_approver, make_employee, db_session: Session
+) -> None:
+    """User direction 2026-09-27: "show all the child details present
+    in master table" — every row, not just active ones (deactivation
+    isn't a real workflow anywhere in this app yet, but the report
+    should still not silently filter on IsActive)."""
+    claimant = login_as(memp_id=940013, employee_id="94000013", Joindate=datetime(2018, 1, 1))
+    active_child = _add_child(claimant, "Report Kid Seven", "2024-06-01")
+    inactive_child = _add_child(claimant, "Report Kid Eight", "2020-06-01")
+
+    db_session.query(ChildMaster).filter(
+        ChildMaster.ChildID == inactive_child["child_id"]
+    ).update({ChildMaster.IsActive: False})
+    db_session.flush()
+
+    make_employee(memp_id=940014, employee_id="94000014", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("94000014")
+    _login_as_existing(claimant, "94000014")
+    hr_client = claimant
+
+    response = hr_client.get(
+        "/api/v1/hr/reports/child-details", params={"employee_id": "94000013"}
+    )
+    assert response.status_code == 200
+    rows = {row["child_id"]: row for row in response.json()["rows"]}
+    assert active_child["child_id"] in rows
+    assert inactive_child["child_id"] in rows
+    assert rows[active_child["child_id"]]["is_active"] is True
+    assert rows[inactive_child["child_id"]]["is_active"] is False
+    assert rows[active_child["child_id"]]["employee_name"] is not None
+    assert rows[active_child["child_id"]]["created_by"] == "94000013"
+
+
+def test_child_details_csv_format(login_as, make_hr_approver, make_employee) -> None:
+    claimant = login_as(memp_id=940015, employee_id="94000015", Joindate=datetime(2018, 1, 1))
+    child = _add_child(claimant, "Report Kid Nine", "2024-06-01")
+
+    make_employee(memp_id=940016, employee_id="94000016", Joindate=datetime(2018, 1, 1))
+    make_hr_approver("94000016")
+    _login_as_existing(claimant, "94000016")
+    hr_client = claimant
+
+    response = hr_client.get("/api/v1/hr/reports/child-details", params={"format": "csv"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+    assert "child_id" in response.text
+    assert child["child_id"] in response.text

@@ -10,6 +10,7 @@ from app.dependencies.auth import get_current_hr_approver
 from app.repositories import financial_year_repository
 from app.schemas.employee import EmployeeProfile
 from app.schemas.reports import (
+    ChildDetailsResponse,
     ClaimsSummaryResponse,
     EligibilityUtilizationResponse,
     HeadcountResponse,
@@ -68,6 +69,26 @@ def eligibility_utilization(
             [row.model_dump(mode="json") for row in report.rows],
             list(report.rows[0].model_dump().keys()) if report.rows else [],
             "eligibility-utilization.csv",
+        )
+    return report
+
+
+@router.get("/hr/reports/child-details", response_model=None)
+def child_details(
+    employee_id: str | None = None,
+    format: str = Query(default="json", pattern="^(json|csv)$"),
+    current_hr_employee: EmployeeProfile = Depends(get_current_hr_approver),
+    db: Session = Depends(get_db),
+) -> ChildDetailsResponse | PlainTextResponse:
+    """Every row on Childcare_ChildMaster (active and inactive), for HR
+    (user direction 2026-09-27) — not scoped by financial year or
+    eligibility, unlike the other reports."""
+    report = report_service.build_child_details(db, employee_id=employee_id)
+    if format == "csv":
+        return _csv_response(
+            [row.model_dump(mode="json") for row in report.rows],
+            list(report.rows[0].model_dump().keys()) if report.rows else [],
+            "child-details.csv",
         )
     return report
 
