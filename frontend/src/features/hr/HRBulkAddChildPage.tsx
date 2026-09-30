@@ -1,7 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { AlertCircle, ArrowLeft, CheckCircle2, Download, Loader2, Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  Loader2,
+  Upload,
+  X,
+} from 'lucide-react'
+import { type DragEvent, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -31,11 +40,18 @@ function downloadTemplate() {
   window.URL.revokeObjectURL(url)
 }
 
+function formatFileSize(bytes: number): string {
+  return bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function HRBulkAddChildPage() {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [file, setFile] = useState<File | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [preview, setPreview] = useState<BulkAddChildrenResponse | null>(null)
   const [committed, setCommitted] = useState<BulkAddChildrenResponse | null>(null)
 
@@ -61,6 +77,17 @@ export function HRBulkAddChildPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  function chooseFile(selected: File | null) {
+    setFile(selected)
+    setPreview(null)
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDragOver(false)
+    chooseFile(event.dataTransfer.files[0] ?? null)
   }
 
   return (
@@ -109,17 +136,64 @@ export function HRBulkAddChildPage() {
               Columns: <code>employee_id</code>, <code>child_name</code>, <code>child_dob</code>{' '}
               (YYYY-MM-DD or DD-MM-YYYY).
             </p>
-            <input
-              id="bulkFile"
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null)
-                setPreview(null)
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault()
+                setIsDragOver(true)
               }}
-              className="mt-2 block w-full text-sm text-slate-600"
-            />
+              onDragLeave={() => setIsDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  fileInputRef.current?.click()
+                }
+              }}
+              className={`mt-2 flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-6 py-8 text-center transition ${
+                isDragOver
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                id="bulkFile"
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+
+              {file ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <FileSpreadsheet className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+                  <span className="font-medium text-slate-800">{file.name}</span>
+                  <span className="text-slate-400">({formatFileSize(file.size)})</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      resetAll()
+                    }}
+                    aria-label="Remove file"
+                    className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Upload className="h-6 w-6 text-slate-400" aria-hidden="true" />
+                  <p className="text-sm text-slate-600">
+                    <span className="font-medium text-indigo-700">Click to upload</span> or drag
+                    and drop a CSV file
+                  </p>
+                </>
+              )}
+            </div>
           </div>
 
           {!preview && (

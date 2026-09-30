@@ -191,44 +191,48 @@ export function ClaimDetailPage() {
             {(['RECEIPT_INVOICE', 'PAYMENT_PROOF'] as const).map((type) => {
               const uploaded = claim.attachments.find((a) => a.attachment_type === type)
               return (
-                <div
-                  key={type}
-                  className="flex items-center justify-between rounded-md border border-slate-200 p-3"
-                >
-                  <div className="flex items-center gap-2 text-sm">
-                    {uploaded ? (
-                      <FileCheck2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                    ) : (
-                      <Upload className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                    )}
-                    <span className="font-medium text-slate-800">
-                      {type === 'RECEIPT_INVOICE' ? 'Receipt / Invoice' : 'Payment Proof'}
-                    </span>
-                    {uploaded && (
-                      <span className="text-slate-500">— {uploaded.original_file_name}</span>
-                    )}
+                <div key={type} className="rounded-md border border-slate-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      {uploaded ? (
+                        <FileCheck2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                      ) : (
+                        <Upload className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                      )}
+                      <span className="font-medium text-slate-800">
+                        {type === 'RECEIPT_INVOICE' ? 'Receipt / Invoice' : 'Payment Proof'}
+                      </span>
+                      {uploaded && (
+                        <span className="text-slate-500">— {uploaded.original_file_name}</span>
+                      )}
+                    </div>
+                    <label className="cursor-pointer rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200">
+                      {uploadingType === type ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : uploaded ? (
+                        'Replace'
+                      ) : (
+                        'Upload'
+                      )}
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0]
+                          if (file) {
+                            uploadMutation.mutate({ type, file })
+                          }
+                          event.target.value = ''
+                        }}
+                      />
+                    </label>
                   </div>
-                  <label className="cursor-pointer rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200">
-                    {uploadingType === type ? (
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    ) : uploaded ? (
-                      'Replace'
-                    ) : (
-                      'Upload'
-                    )}
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      className="hidden"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0]
-                        if (file) {
-                          uploadMutation.mutate({ type, file })
-                        }
-                        event.target.value = ''
-                      }}
-                    />
-                  </label>
+                  {type === 'PAYMENT_PROOF' && (
+                    <p className="mt-1.5 text-xs text-slate-500">
+                      Upload a bank transaction or UPI screenshot for payment proof.
+                    </p>
+                  )}
                 </div>
               )
             })}

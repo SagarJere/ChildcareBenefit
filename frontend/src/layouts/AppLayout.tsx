@@ -8,6 +8,14 @@ const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
   }`
 
+// A permanent light-indigo "chip" look (rather than plain text until
+// active, like the other nav links) so the HR Dashboard entry stands
+// out slightly as its own section, without being loud about it.
+const hrNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
+  `rounded-md px-2.5 py-1.5 text-sm font-medium transition ${
+    isActive ? 'bg-indigo-100 text-indigo-800' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+  }`
+
 export function AppLayout() {
   const { employee, signOut } = useAuth()
 
@@ -35,7 +43,7 @@ export function AppLayout() {
               My Payout
             </NavLink>
             {employee?.is_hr_approver && (
-              <NavLink to="/hr/dashboard" className={navLinkClasses}>
+              <NavLink to="/hr/dashboard" className={hrNavLinkClasses}>
                 HR Dashboard
               </NavLink>
             )}
@@ -74,7 +82,7 @@ export function AppLayout() {
             My Payout
           </NavLink>
           {employee?.is_hr_approver && (
-            <NavLink to="/hr/dashboard" className={navLinkClasses}>
+            <NavLink to="/hr/dashboard" className={hrNavLinkClasses}>
               HR Dashboard
             </NavLink>
           )}
